@@ -40,8 +40,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     return ok
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submitAuth = async () => {
     if (!validate()) return
     setLoading(true)
 
@@ -139,7 +138,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             </div>
 
             {/* ── Email / PW form ── */}
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'fadeUp .55s ease' }}>
+            <form onSubmit={e => { e.preventDefault(); submitAuth() }} style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'fadeUp .55s ease' }}>
               <div>
                 <div className="pl-input-wrap">
                   <input
@@ -191,7 +190,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
             <p style={{ textAlign: 'center', fontSize: 12, color: '#BFA99E', margin: '10px 0 0', animation: 'fadeUp .6s ease' }}>
               계정이 없으신가요?{' '}
-              <span style={{ color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}>이메일로 회원가입</span>
+              <span onClick={() => submitAuth()} style={{ color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }} title="위 이메일·비밀번호를 입력한 뒤 눌러주세요 — 처음 가입하는 이메일이면 자동으로 계정이 생성됩니다">이메일로 회원가입</span>
             </p>
 
             {/* Divider */}
