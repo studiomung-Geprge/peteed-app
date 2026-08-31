@@ -111,7 +111,7 @@ export default function WalletTab({ petName, petPhoto, guardianName, onQRClick, 
           <div className="row-icon" style={{ background: 'var(--teal-light)' }}>{PulseIcon('var(--teal)')}</div>
           <div style={{ flex: 1 }}>
             <p className="row-title">종합백신(DHPP) 2차</p>
-            <p className="row-sub">2026.05.20 · 안동동물병원 · 박서연 수의사</p>
+            <p className="row-sub">2026.08.16 · 안동동물병원 · 박서연 수의사</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
             <div className="chip teal">완료</div>
@@ -124,7 +124,7 @@ export default function WalletTab({ petName, petPhoto, guardianName, onQRClick, 
           <div className="row-icon" style={{ background: 'var(--gold-light)' }}>{PulseIcon('var(--gold)')}</div>
           <div style={{ flex: 1 }}>
             <p className="row-title">광견병 백신</p>
-            <p className="row-sub">2026.06.05 예정 · D-5 · 안동동물병원</p>
+            <p className="row-sub">2026.09.05 예정 · D-5 · 안동동물병원</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
             <div className="chip gold">예정</div>

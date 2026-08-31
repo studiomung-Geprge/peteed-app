@@ -80,15 +80,10 @@ function exportToGoogleCalendar() {
 }
 
 export default function HealthCalendar({ onSelectRecord }: Props) {
-  // Default to the month of the most recent record so there's always
-  // something to see at a glance, instead of starting on an empty month.
-  const initialMonth = useMemo(() => {
-    const latest = HEALTH_RECORDS.reduce((max, rec) => {
-      const d = parseRecordDate(rec.date)
-      return d > max ? d : max
-    }, parseRecordDate(HEALTH_RECORDS[0].date))
-    return new Date(latest.getFullYear(), latest.getMonth(), 1)
-  }, [])
+  // Always open on the real current month, so "today" is on-screen by default.
+  const today = useMemo(() => new Date(), [])
+  const todayKey = `${today.getFullYear()}.${pad2(today.getMonth() + 1)}.${pad2(today.getDate())}`
+  const initialMonth = useMemo(() => new Date(today.getFullYear(), today.getMonth(), 1), [today])
 
   const [viewMonth, setViewMonth] = useState(initialMonth)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -197,6 +192,7 @@ export default function HealthCalendar({ onSelectRecord }: Props) {
           const key = keyFor(day)
           const dayRecords = recordsByDay.get(key)
           const isSelected = selectedKey === key
+          const isToday = key === todayKey
           return (
             <button
               key={i}
@@ -205,19 +201,25 @@ export default function HealthCalendar({ onSelectRecord }: Props) {
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 gap: 2, padding: '5px 0', borderRadius: 10, border: 'none',
-                background: isSelected ? 'var(--gold)' : 'transparent',
+                background: isSelected ? 'var(--gold-light)' : 'transparent',
                 cursor: dayRecords ? 'pointer' : 'default',
                 fontFamily: "'Roboto Mono', monospace",
               }}
             >
-              <span style={{ fontSize: 11, fontWeight: dayRecords ? 800 : 500, color: isSelected ? '#fff' : dayRecords ? 'var(--ink)' : 'var(--ink-45)' }}>
+              <span style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 20, height: 20, borderRadius: '50%',
+                background: isToday ? 'var(--gold)' : 'transparent',
+                fontSize: 11, fontWeight: (dayRecords || isToday) ? 800 : 500,
+                color: isToday ? '#fff' : (dayRecords ? 'var(--ink)' : 'var(--ink-45)'),
+              }}>
                 {day}
               </span>
               <span style={{ display: 'flex', gap: 2, height: 4 }}>
                 {(dayRecords ?? []).slice(0, 3).map((r, di) => (
                   <span key={di} style={{
                     width: 4, height: 4, borderRadius: '50%',
-                    background: isSelected ? '#fff' : (TYPE_COLOR[r.rec.type] ?? 'var(--ink)'),
+                    background: TYPE_COLOR[r.rec.type] ?? 'var(--ink)',
                   }} />
                 ))}
               </span>
