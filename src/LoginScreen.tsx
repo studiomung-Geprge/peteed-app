@@ -26,25 +26,37 @@ function EyeOffIcon() {
 }
 
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [password2, setPassword2] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [emailError, setEmailError] = useState('')
   const [pwError, setPwError] = useState('')
+  const [pw2Error, setPw2Error] = useState('')
   const [loading, setLoading] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState(false)
+
+  const switchMode = (next: 'login' | 'signup') => {
+    setMode(next)
+    setEmailError('')
+    setPwError('')
+    setPw2Error('')
+    setPendingConfirm(false)
+  }
 
   const validate = () => {
     let ok = true
     if (!email.includes('@')) { setEmailError('올바른 이메일 주소를 입력해 주세요'); ok = false } else setEmailError('')
     if (password.length < 6) { setPwError('비밀번호를 6자 이상 입력해 주세요'); ok = false } else setPwError('')
+    if (mode === 'signup') {
+      if (password2 !== password) { setPw2Error('비밀번호가 일치하지 않아요'); ok = false } else setPw2Error('')
+    }
     return ok
   }
 
   const submitAuth = async () => {
     if (!validate()) return
-    setPwError('')
-    setPendingConfirm(false)
     setLoading(true)
 
     if (!SUPABASE_ENABLED || !supabase) {
@@ -55,46 +67,44 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-      if (signInError) {
-        const msg = signInError.message.toLowerCase()
+      if (mode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        })
+        if (error) {
+          const msg = error.message.toLowerCase()
+          if (msg.includes('already registered') || msg.includes('already exists')) {
+            setLoading(false)
+            setEmailError('이미 가입된 이메일이에요. 로그인해 주세요')
+            return
+          }
+          throw error
+        }
+        setLoading(false)
+        if (!data.session) {
+          // Email confirmation is required — Supabase just sent the link.
+          setPendingConfirm(true)
+        } else {
+          onLogin()
+        }
+        return
+      }
 
+      // mode === 'login'
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        const msg = error.message.toLowerCase()
         if (msg.includes('email not confirmed')) {
           // Account exists but hasn't clicked the confirmation link yet.
           setLoading(false)
           setPendingConfirm(true)
           return
         }
-
-        if (msg.includes('invalid login credentials')) {
-          // Could be a brand-new email (demo convenience: first login with a
-          // given email creates the account, no separate sign-up screen) OR
-          // an existing account with a wrong password. Try sign-up to tell
-          // the two apart.
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: { emailRedirectTo: window.location.origin },
-          })
-          if (signUpError) {
-            if (signUpError.message.toLowerCase().includes('already registered')) {
-              setLoading(false)
-              setPwError('비밀번호가 올바르지 않아요')
-              return
-            }
-            throw signUpError
-          }
-          setLoading(false)
-          if (!signUpData.session) {
-            // Email confirmation is required — Supabase just sent the link.
-            setPendingConfirm(true)
-          } else {
-            onLogin()
-          }
-          return
-        }
-
-        throw signInError
+        setLoading(false)
+        setPwError('이메일 또는 비밀번호가 올바르지 않아요')
+        return
       }
       setLoading(false)
       onLogin()
@@ -109,7 +119,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         // instead of leaving the user stuck on a spinner.
         onLogin()
       } else {
-        setPwError('로그인에 실패했어요. 이메일과 비밀번호를 확인해 주세요')
+        setPwError(mode === 'signup'
+          ? '회원가입에 실패했어요. 잠시 후 다시 시도해 주세요'
+          : '로그인에 실패했어요. 이메일과 비밀번호를 확인해 주세요')
       }
     }
   }
@@ -192,7 +204,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   메일함에서 링크를 눌러 인증을 완료한 뒤 다시 로그인해 주세요.
                 </p>
                 <button
-                  onClick={() => setPendingConfirm(false)}
+                  onClick={() => switchMode('login')}
                   className="login-submit-btn"
                   style={{ marginTop: 6 }}
                 >
@@ -201,6 +213,14 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               </div>
             ) : (
               <>
+                {/* Mode heading */}
+                <p style={{
+                  textAlign: 'center', margin: '0 0 12px', animation: 'fadeUp .5s ease',
+                  fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 900, fontSize: 17, color: '#1C1C1A',
+                }}>
+                  {mode === 'login' ? '로그인' : '이메일로 회원가입'}
+                </p>
+
                 <form onSubmit={e => { e.preventDefault(); submitAuth() }} style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'fadeUp .55s ease' }}>
                   <div>
                     <div className="pl-input-wrap">
@@ -225,10 +245,10 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                       <input
                         className={`pl-input${pwError ? ' error' : ''}`}
                         type={showPw ? 'text' : 'password'}
-                        placeholder="비밀번호"
+                        placeholder={mode === 'login' ? '비밀번호' : '비밀번호 (6자 이상)'}
                         value={password}
                         onChange={e => { setPassword(e.target.value); setPwError('') }}
-                        autoComplete="current-password"
+                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                         style={{ paddingRight: 42 }}
                       />
                       <span onClick={() => setShowPw(v => !v)}
@@ -239,27 +259,58 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                     {pwError && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{pwError}</p>}
                   </div>
 
-                  <div style={{ textAlign: 'right', marginTop: -2 }}>
-                    <span style={{ fontSize: 11.5, color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}>비밀번호 찾기</span>
-                  </div>
+                  {mode === 'signup' && (
+                    <div>
+                      <div className="pl-input-wrap">
+                        <input
+                          className={`pl-input${pw2Error ? ' error' : ''}`}
+                          type={showPw ? 'text' : 'password'}
+                          placeholder="비밀번호 확인"
+                          value={password2}
+                          onChange={e => { setPassword2(e.target.value); setPw2Error('') }}
+                          autoComplete="new-password"
+                        />
+                      </div>
+                      {pw2Error && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{pw2Error}</p>}
+                    </div>
+                  )}
+
+                  {mode === 'login' && (
+                    <div style={{ textAlign: 'right', marginTop: -2 }}>
+                      <span style={{ fontSize: 11.5, color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}>비밀번호 찾기</span>
+                    </div>
+                  )}
 
                   <button type="submit" disabled={loading} className="login-submit-btn">
                     {loading
-                      ? <><span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,.35)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin .7s linear infinite' }} />로그인 중…</>
-                      : '로그인'
+                      ? <><span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,.35)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin .7s linear infinite' }} />{mode === 'login' ? '로그인 중…' : '가입 중…'}</>
+                      : (mode === 'login' ? '로그인' : '가입하기')
                     }
                   </button>
                 </form>
 
                 <p style={{ textAlign: 'center', fontSize: 12, color: '#BFA99E', margin: '10px 0 0', animation: 'fadeUp .6s ease' }}>
-                  계정이 없으신가요?{' '}
-                  <span
-                    onClick={() => submitAuth()}
-                    style={{ color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}
-                    title="위 이메일·비밀번호를 입력한 뒤 눌러주세요 — 처음 가입하는 이메일이면 인증 메일이 발송됩니다"
-                  >
-                    이메일로 회원가입
-                  </span>
+                  {mode === 'login' ? (
+                    <>
+                      계정이 없으신가요?{' '}
+                      <span
+                        onClick={() => switchMode('signup')}
+                        style={{ color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        이메일로 회원가입
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      이미 계정이 있으신가요?{' '}
+                      <span
+                        onClick={() => switchMode('login')}
+                        style={{ color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        로그인
+                      </span>
+                    </>
+                  )}
                 </p>
               </>
             )}
