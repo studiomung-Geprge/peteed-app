@@ -31,7 +31,7 @@ const TAB_ICONS: Record<TabId, (c?: string) => ReactElement> = {
 
 const TAB_LABELS: Record<TabId, string> = {
   home: '홈', wallet: '신분증', health: '건강기록',
-  facilities: '시설예약', emergency: '응급',
+  facilities: '시설예약', emergency: '응급/실종',
 }
 
 export default function App() {

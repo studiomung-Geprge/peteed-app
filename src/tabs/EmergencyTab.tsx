@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type PointerEvent as ReactPointerEvent } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import MissingReportModal from '../modals/MissingReportModal'
 import { SAMPLE_REPORTS, type MissingReport, type ReportStatus } from '../data/missingReports'
 
@@ -19,8 +19,6 @@ interface Props {
   onOpenMap: (location: string) => void
 }
 
-const CENTER_PIN = { x: 50, y: 46 }
-
 export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType, onOpenMap }: Props) {
   const [searchInput, setSearchInput] = useState('')
   const [searchedAddress, setSearchedAddress] = useState('')
@@ -28,7 +26,10 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
   const [mapLoading, setMapLoading] = useState(true)
   const [activePin, setActivePin] = useState<'current' | 'searched'>('current')
   const [showMissingModal, setShowMissingModal] = useState(false)
+  const [showActionMenu, setShowActionMenu] = useState(false)
+  const [bloodHighlight, setBloodHighlight] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const bloodCardRef = useRef<HTMLDivElement>(null)
 
   // 실종/응급 신청 리스트 — 내가 접수한 신고가 맨 앞에 추가되고, 나머지는 샘플 데이터
   const [reports, setReports] = useState<MissingReport[]>(SAMPLE_REPORTS)
@@ -56,15 +57,6 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
     setConfirmingCancelId(null)
   }
 
-  // Custom draggable pin overlaid on the map, so a searched-by-name result
-  // can be nudged to the exact spot rather than trusting the geocoder alone.
-  const mapAreaRef = useRef<HTMLDivElement>(null)
-  const draggingRef = useRef(false)
-  const [pinPos, setPinPos] = useState(CENTER_PIN)
-  const [draftPos, setDraftPos] = useState<{ x: number; y: number } | null>(null)
-  const [showLabelEditor, setShowLabelEditor] = useState(false)
-  const [labelDraft, setLabelDraft] = useState('')
-
   useEffect(() => {
     setMapSrc(makeMapSrc(DEFAULT_LOCATION))
     setMapLoading(true)
@@ -77,64 +69,28 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
     setSearchedAddress(q)
     setActivePin('searched')
     setMapLoading(true)
-    setPinPos(CENTER_PIN)
-    setDraftPos(null)
-    setShowLabelEditor(false)
   }
 
   const handleCurrentLocation = () => {
     setMapSrc(makeMapSrc(DEFAULT_LOCATION))
     setActivePin('current')
     setMapLoading(true)
-    setPinPos(CENTER_PIN)
-    setDraftPos(null)
-    setShowLabelEditor(false)
   }
 
-  const clampPct = (v: number) => Math.min(96, Math.max(4, v))
-
-  const posFromPointer = (e: { clientX: number; clientY: number }) => {
-    const el = mapAreaRef.current
-    if (!el) return CENTER_PIN
-    const rect = el.getBoundingClientRect()
-    return {
-      x: clampPct(((e.clientX - rect.left) / rect.width) * 100),
-      y: clampPct(((e.clientY - rect.top) / rect.height) * 100),
-    }
-  }
-
-  const handlePinPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId)
-    draggingRef.current = true
-    setDraftPos(posFromPointer(e))
-  }
-  const handlePinPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return
-    setDraftPos(posFromPointer(e))
-  }
-  const handlePinPointerUp = () => {
-    if (!draggingRef.current) return
-    draggingRef.current = false
-    setLabelDraft(searchedAddress)
-    setShowLabelEditor(true)
-  }
-
-  const confirmPinLabel = () => {
-    if (draftPos) setPinPos(draftPos)
-    const label = labelDraft.trim()
-    if (label) {
-      setSearchedAddress(label)
-      setActivePin('searched')
-    }
-    setShowLabelEditor(false)
-    setDraftPos(null)
-  }
-  const cancelPinLabel = () => {
-    setShowLabelEditor(false)
-    setDraftPos(null)
-  }
-
+  // 현재 위치 / 검색된 위치 중 선택된 쪽의 주소가 그대로 응급·실종 신고의 위치로 등록돼요.
   const currentMapLocation = activePin === 'searched' && searchedAddress ? searchedAddress : DEFAULT_LOCATION
+
+  const openMissingReport = () => {
+    setShowActionMenu(false)
+    setShowMissingModal(true)
+  }
+
+  const requestBloodMatch = () => {
+    setShowActionMenu(false)
+    bloodCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setBloodHighlight(true)
+    setTimeout(() => setBloodHighlight(false), 1600)
+  }
 
   return (
     <>
@@ -154,7 +110,7 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
       <h1 className="page-title">응급 · 실종</h1>
       <p className="sub">위치기반 실종 신고와 응급 헌혈 매칭을 지원해요</p>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, position: 'relative' }}>
         {/* Registered pet mini-card */}
         <div style={{
           flexShrink: 0, width: 78,
@@ -170,7 +126,7 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
           }}>{petBloodType}</span>
         </div>
 
-        <button className="sos-btn" style={{ flex: 1, margin: 0 }} onClick={() => setShowMissingModal(true)}>
+        <button className="sos-btn" style={{ flex: 1, margin: 0 }} onClick={() => setShowActionMenu(v => !v)}>
           <div className="ic">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -178,8 +134,62 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
               <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
           </div>
-          <div><b>실종 신고하기</b><span>QR 태그 · GPS 반경 10km/30km 알림</span></div>
+          <div><b>응급/실종 신고하기</b><span>탭하여 실종 신고 · 헌혈 요청 중 선택</span></div>
         </button>
+
+        {showActionMenu && (
+          <>
+            <div onClick={() => setShowActionMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+            <div style={{
+              position: 'absolute', top: '100%', marginTop: 8, left: 86, right: 0, zIndex: 151,
+              background: '#fff', borderRadius: 16, border: '1px solid var(--hair)',
+              boxShadow: '0 16px 36px -10px rgba(0,0,0,.3)', overflow: 'hidden',
+            }}>
+              <button
+                onClick={openMissingReport}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', background: '#fff', border: 'none', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                  background: '#FFF0EB', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E8521F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 12.5, fontWeight: 800, color: '#1C1C1A', fontFamily: "'Noto Sans KR',sans-serif" }}>실종 신고</p>
+                  <p style={{ margin: '1px 0 0', fontSize: 10.5, color: '#999' }}>반려동물을 잃어버렸어요</p>
+                </div>
+              </button>
+              <div style={{ height: 1, background: 'var(--hair)' }} />
+              <button
+                onClick={requestBloodMatch}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', background: '#fff', border: 'none', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                  background: '#FDEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8342A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 12.5, fontWeight: 800, color: '#1C1C1A', fontFamily: "'Noto Sans KR',sans-serif" }}>응급 헌혈 요청</p>
+                  <p style={{ margin: '1px 0 0', fontSize: 10.5, color: '#999' }}>혈액이 급히 필요해요</p>
+                </div>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Map section */}
@@ -303,71 +313,7 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
             referrerPolicy="no-referrer-when-downgrade"
           />
 
-          {/* Draggable pin overlay — lets a name search result be nudged to
-              the exact spot instead of trusting the geocoder alone */}
-          {!mapLoading && (
-            <div
-              ref={mapAreaRef}
-              onPointerDown={handlePinPointerDown}
-              onPointerMove={handlePinPointerMove}
-              onPointerUp={handlePinPointerUp}
-              onPointerCancel={handlePinPointerUp}
-              style={{ position: 'absolute', inset: 0, zIndex: 1, cursor: 'grab', touchAction: 'none' }}
-            >
-              <div style={{
-                position: 'absolute',
-                left: `${(draftPos ?? pinPos).x}%`,
-                top: `${(draftPos ?? pinPos).y}%`,
-                transform: 'translate(-50%, -100%)',
-                pointerEvents: 'none',
-                transition: draftPos ? 'none' : 'left .18s ease, top .18s ease',
-              }}>
-                <svg width="28" height="36" viewBox="0 0 30 38" style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.35))' }}>
-                  <path d="M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z" fill={activePin === 'current' ? '#2563EB' : '#FF6B4A'}/>
-                  <circle cx="15" cy="15" r="6.5" fill="#fff"/>
-                </svg>
-              </div>
-            </div>
-          )}
-
-          {/* Pin label editor — appears right after the pin is dropped */}
-          {showLabelEditor && (
-            <div style={{
-              position: 'absolute', left: 8, right: 8, bottom: 8, zIndex: 6,
-              background: '#fff', borderRadius: 12, padding: 8,
-              boxShadow: '0 8px 22px rgba(0,0,0,.28)',
-              display: 'flex', flexDirection: 'column', gap: 6,
-            }}>
-              <span style={{ fontSize: 9.5, fontWeight: 700, color: '#999', paddingLeft: 2 }}>이 위치를 무엇이라고 부를까요?</span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input
-                  autoFocus
-                  value={labelDraft}
-                  onChange={e => setLabelDraft(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && confirmPinLabel()}
-                  placeholder="예: 정문 앞 화단, 놀이터 벤치"
-                  style={{
-                    flex: 1, border: '1.5px solid #E8D5CE', borderRadius: 8, padding: '7px 9px',
-                    fontSize: 11.5, outline: 'none', fontFamily: "'Noto Sans KR', sans-serif", color: '#1C1C1A',
-                  }}
-                />
-                <button onClick={cancelPinLabel} style={{
-                  padding: '0 10px', borderRadius: 8, border: '1.5px solid #E0E0E0',
-                  background: '#fff', color: '#888', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  fontFamily: "'Noto Sans KR', sans-serif",
-                }}>취소</button>
-                <button onClick={confirmPinLabel} style={{
-                  padding: '0 12px', borderRadius: 8, border: 'none',
-                  background: 'linear-gradient(135deg,#FF6B4A,#E8521F)', color: '#fff',
-                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  fontFamily: "'Noto Sans KR', sans-serif",
-                }}>설정</button>
-              </div>
-            </div>
-          )}
-
-          {/* Active pin badge — zIndex above the drag-capture overlay so it
-              stays visible and doesn't intercept its clicks */}
+          {/* Active pin badge */}
           {!mapLoading && (
             <div style={{
               position: 'absolute', bottom: 10, left: 10, zIndex: 3,
@@ -397,7 +343,7 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
             </div>
           )}
 
-          {/* 지도에서 열기 → App 레벨 팝업 (드래그 오버레이보다 위에 두어 클릭 가능하게 유지) */}
+          {/* 지도에서 열기 → App 레벨 팝업 */}
           {!mapLoading && (
             <button
               onClick={() => onOpenMap(currentMapLocation)}
@@ -439,9 +385,6 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
             {activePin === 'current' ? 'GPS 5분 전' : '검색 결과'}
           </span>
         </div>
-        <p style={{ margin: 0, padding: '0 12px 9px', fontSize: 9.5, color: '#bbb', background: '#fff' }}>
-          📍 지도 위 핀을 드래그하면 정확한 위치로 조정할 수 있어요
-        </p>
       </div>
 
       {/* 실종/응급 신청 리스트 */}
@@ -542,7 +485,15 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
       </div>
 
       <div className="section-label">응급 헌혈 매칭</div>
-      <div className="blood-card">
+      <div
+        ref={bloodCardRef}
+        className="blood-card"
+        style={{
+          transition: 'box-shadow .3s, transform .3s',
+          boxShadow: bloodHighlight ? '0 0 0 3px rgba(255,107,74,.45)' : 'none',
+          transform: bloodHighlight ? 'scale(1.015)' : 'scale(1)',
+        }}
+      >
         <div className="row">
           <div className="row-icon" style={{ background: '#fff' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--coral)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
