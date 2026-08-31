@@ -1,14 +1,12 @@
+import HealthCalendar from '../HealthCalendar'
+import { HEALTH_RECORDS } from '../data/healthRecords'
+
 interface Props {
   onOpenCamera: () => void
   onSelectRecord: (id: number) => void
 }
 
-const RECORDS = [
-  { id: 0, date: '2026.06.02', title: '슬개골 정기 검진', chip: 'ink', label: '진료' },
-  { id: 1, date: '2026.05.20', title: '종합백신(DHPP) 2차', chip: 'teal', label: '예방접종' },
-  { id: 2, date: '2026.05.02', title: '심장사상충 예방약 처방', chip: 'gold', label: '처방' },
-  { id: 3, date: '2026.04.11', title: '스케일링 · 구강 검진', chip: 'ink', label: '진료' },
-]
+const CHIP_CLASS: Record<string, string> = { '진료': 'ink', '예방접종': 'teal', '처방': 'gold' }
 
 export default function HealthTab({ onOpenCamera, onSelectRecord }: Props) {
   return (
@@ -16,6 +14,8 @@ export default function HealthTab({ onOpenCamera, onSelectRecord }: Props) {
       <p className="eyebrow">HEALTH RECORD</p>
       <h1 className="page-title">건강기록</h1>
       <p className="sub">진료 서류를 촬영하면 AI가 자동으로 정리해요</p>
+
+      <HealthCalendar onSelectRecord={onSelectRecord} />
 
       <div className="flow-cta" style={{ cursor: 'pointer' }} onClick={onOpenCamera}>
         <div className="ic">
@@ -38,16 +38,16 @@ export default function HealthTab({ onOpenCamera, onSelectRecord }: Props) {
       </div>
 
       <div className="section-label">최근 기록</div>
-      {RECORDS.map(rec => (
-        <div key={rec.id} className="tl-item" style={{ alignItems: 'center' }}>
+      {HEALTH_RECORDS.map((rec, id) => (
+        <div key={id} className="tl-item" style={{ alignItems: 'center' }}>
           <div className="tl-dot" />
           <div style={{ flex: 1 }}>
             <p className="tl-date">{rec.date}</p>
             <p className="tl-title">{rec.title}</p>
-            <span className={`chip ${rec.chip}`}>{rec.label}</span>
+            <span className={`chip ${CHIP_CLASS[rec.type] ?? 'ink'}`}>{rec.type}</span>
           </div>
           <button
-            onClick={() => onSelectRecord(rec.id)}
+            onClick={() => onSelectRecord(id)}
             style={{
               flexShrink: 0, marginLeft: 8,
               padding: '5px 10px', borderRadius: 8,
