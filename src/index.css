@@ -19,6 +19,8 @@
 
 * { box-sizing: border-box; }
 
+#root { width: 100%; }
+
 body {
   margin: 0;
   font-family: 'Noto Sans KR', sans-serif;
@@ -504,4 +506,32 @@ h1.page-title {
   color: rgba(250,247,239,.5);
   font-size: 12px;
   letter-spacing: .04em;
+}
+
+/* 실제 휴대폰(좁은 뷰포트)에서는 데스크톱용 목업 프레임을 걷어내고
+   화면 전체를 그대로 채우는 실제 앱처럼 보이도록 전환한다. */
+@media (max-width: 480px) {
+  body {
+    padding: 0;
+    background: var(--paper);
+    align-items: stretch;
+  }
+
+  .pl-device {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    background: var(--paper);
+  }
+
+  .pl-screen {
+    border-radius: 0;
+  }
+
+  .device-label {
+    display: none;
+  }
 }
