@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
-import { getMyPet, createMyPet, updateGuardianName } from './lib/petData'
+import { getMyPet, createMyPet, updateGuardianName, updatePetName, getGuardianName } from './lib/petData'
 import LoginScreen from './LoginScreen'
 import OnboardingScreen from './OnboardingScreen'
 import QRModal from './QRModal'
@@ -15,6 +15,7 @@ import EmergencyTab from './tabs/EmergencyTab'
 import HealthRecordModal from './modals/HealthRecordModal'
 import GovIdModal from './modals/GovIdModal'
 import MapPopupModal from './modals/MapPopupModal'
+import EditProfileModal from './modals/EditProfileModal'
 
 type TabId = 'home' | 'wallet' | 'health' | 'facilities' | 'emergency'
 
@@ -48,7 +49,9 @@ export default function App() {
   const [petPhoto, setPetPhoto] = useState('https://images.unsplash.com/photo-1736196674354-b5e918a64644?w=400&h=400&fit=crop&crop=face')
   const [petBreed, setPetBreed] = useState('사모예드 · 4세 · 남아(중성화) · MANDU')
   const [petName, setPetName] = useState('만두')
+  const [petId, setPetId] = useState<string | null>(null)
   const [guardianName, setGuardianName] = useState('죠지')
+  const [showEditProfile, setShowEditProfile] = useState(false)
   // null = not checked yet, true = real Supabase user with no pet on file
   // (needs the one-time onboarding form), false = ready to show the app.
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null)
@@ -68,28 +71,31 @@ export default function App() {
   // form instead of a hardcoded "만두" placeholder.
   useEffect(() => {
     if (!session?.user) { setNeedsOnboarding(false); return }
-    getMyPet(session.user.id)
-      .then(pet => {
+    Promise.all([getMyPet(session.user.id), getGuardianName(session.user.id)])
+      .then(([pet, fullName]) => {
+        if (fullName) setGuardianName(fullName)
         if (pet) {
           setPetName(pet.name)
+          setPetId(pet.id)
           if (pet.photo_url) setPetPhoto(pet.photo_url)
           setNeedsOnboarding(false)
         } else {
           setNeedsOnboarding(true)
         }
       })
-      .catch(err => { console.warn('getMyPet failed:', err); setNeedsOnboarding(false) })
+      .catch(err => { console.warn('profile/pet fetch failed:', err); setNeedsOnboarding(false) })
   }, [session?.user?.id])
 
   const handleOnboardingComplete = async (newGuardianName: string, newPetName: string) => {
     if (!session?.user) return
     try {
-      await Promise.all([
+      const [, pet] = await Promise.all([
         updateGuardianName(session.user.id, newGuardianName),
         createMyPet(session.user.id, newPetName),
       ])
       setGuardianName(newGuardianName)
       setPetName(newPetName)
+      setPetId(pet.id)
       setNeedsOnboarding(false)
     } catch (err) {
       console.warn('onboarding save failed:', err)
@@ -99,6 +105,21 @@ export default function App() {
       setPetName(newPetName)
       setNeedsOnboarding(false)
     }
+  }
+
+  const handleEditProfileSave = async (newGuardianName: string, newPetName: string) => {
+    if (session?.user) {
+      try {
+        const updates: Promise<unknown>[] = [updateGuardianName(session.user.id, newGuardianName)]
+        if (petId) updates.push(updatePetName(petId, newPetName))
+        await Promise.all(updates)
+      } catch (err) {
+        console.warn('edit profile save failed:', err)
+      }
+    }
+    setGuardianName(newGuardianName)
+    setPetName(newPetName)
+    setShowEditProfile(false)
   }
 
   if (!loggedIn) return <LoginScreen onLogin={() => setDemoLoggedIn(true)} />
@@ -144,6 +165,14 @@ export default function App() {
           {govIdModal && <GovIdModal guardian={govIdModal} onClose={() => setGovIdModal(null)} />}
           {healthRecord !== null && <HealthRecordModal id={healthRecord} onClose={() => setHealthRecord(null)} />}
           {mapPopup && <MapPopupModal location={mapPopup} onClose={() => setMapPopup(null)} />}
+          {showEditProfile && (
+            <EditProfileModal
+              guardianName={guardianName}
+              petName={petName}
+              onClose={() => setShowEditProfile(false)}
+              onSave={handleEditProfileSave}
+            />
+          )}
           <div className="pl-dyn-island" />
           <div className="pl-status-bar">
             <span>9:41</span>
@@ -184,6 +213,7 @@ export default function App() {
                 onQRClick={() => setShowQR(true)}
                 onSelectRecord={id => setHealthRecord(id)}
                 onSelectGuardian={g => setGovIdModal(g)}
+                onEditProfile={() => setShowEditProfile(true)}
               />
             </div>
 

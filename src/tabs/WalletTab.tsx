@@ -7,6 +7,16 @@ interface Props {
   onQRClick: () => void
   onSelectRecord: (id: number) => void
   onSelectGuardian: (g: 'A' | 'B') => void
+  onEditProfile: () => void
+}
+
+function EditIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9"/>
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+    </svg>
+  )
 }
 
 function QRCode({ size = 50 }: { size?: number }) {
@@ -48,11 +58,26 @@ const PulseIcon = (color: string) => (
   </svg>
 )
 
-export default function WalletTab({ petName, petPhoto, guardianName, onQRClick, onSelectRecord, onSelectGuardian }: Props) {
+export default function WalletTab({ petName, petPhoto, guardianName, onQRClick, onSelectRecord, onSelectGuardian, onEditProfile }: Props) {
   return (
     <>
       <p className="eyebrow">PETEED</p>
-      <h1 className="page-title">{petName}의 ID</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 4px' }}>
+        <h1 className="page-title" style={{ margin: 0 }}>{petName}의 ID</h1>
+        <button
+          onClick={onEditProfile}
+          title="보호자·반려동물 이름 수정"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: 'var(--paper-2)', border: 'none', borderRadius: 20,
+            padding: '6px 11px', cursor: 'pointer', flexShrink: 0,
+            fontFamily: "'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 700, color: '#7A5C52',
+          }}
+        >
+          <EditIcon />
+          수정
+        </button>
+      </div>
       <p className="sub">PETEED에서 발급한 반려동물 디지털 신분증이에요</p>
 
       <div className="passport-card">

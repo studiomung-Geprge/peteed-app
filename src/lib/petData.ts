@@ -59,9 +59,22 @@ export async function createMyPet(userId: string, name: string): Promise<MyPet> 
   return pet as MyPet
 }
 
+export async function getGuardianName(userId: string): Promise<string | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase.from('profiles').select('full_name').eq('id', userId).maybeSingle()
+  if (error) throw error
+  return data?.full_name ?? null
+}
+
 export async function updateGuardianName(userId: string, fullName: string): Promise<void> {
   if (!supabase) return
   const { error } = await supabase.from('profiles').update({ full_name: fullName }).eq('id', userId)
+  if (error) throw error
+}
+
+export async function updatePetName(petId: string, name: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.from('pets').update({ name }).eq('id', petId)
   if (error) throw error
 }
 
