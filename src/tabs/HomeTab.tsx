@@ -40,9 +40,28 @@ function QRCode({ size = 50 }: { size?: number }) {
 export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onPhotoClick, onQRClick, onViewAllClick, onQuickAction, onLogout }: Props) {
   return (
     <>
-      <p className="eyebrow">GYEONGSANGBUK-DO · PETEED</p>
-      <h1 className="page-title">안녕하세요, {guardianName} 보호자님</h1>
-      <p className="sub">경상북도 안동시 · 오늘도 {petName}와 좋은 하루 보내세요</p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <p className="eyebrow">GYEONGSANGBUK-DO · PETEED</p>
+          <h1 className="page-title">안녕하세요, {guardianName} 보호자님</h1>
+          <p className="sub">경상북도 안동시 · 오늘도 {petName}와 좋은 하루 보내세요</p>
+        </div>
+        <button
+          onClick={onLogout}
+          title="로그아웃"
+          aria-label="로그아웃"
+          style={{
+            flexShrink: 0, marginTop: 1,
+            width: 34, height: 34, borderRadius: '50%',
+            border: '1px solid var(--hair)', background: '#fff',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--ink-45)',
+          }}
+        >
+          {Icons.logout('currentColor')}
+        </button>
+      </div>
 
       <div className="passport-card">
         <div className="passport-top">
@@ -140,12 +159,6 @@ export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onP
         <div className="notif">
           <div className="dot2" /><div><b>영양 동물복지센터 신규 개장</b><span>디지털 예약이 오픈되었어요</span></div>
         </div>
-      </div>
-
-      <div style={{ textAlign: 'center', margin: '18px 0 4px' }}>
-        <span onClick={onLogout} style={{ fontSize: 11, color: 'var(--ink-45)', cursor: 'pointer', textDecoration: 'underline' }}>
-          로그아웃
-        </span>
       </div>
     </>
   )
