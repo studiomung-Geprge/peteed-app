@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import MissingReportModal from '../modals/MissingReportModal'
 import ReportDetailModal from '../modals/ReportDetailModal'
-import { SAMPLE_REPORTS, type MissingReport, type ReportStatus } from '../data/missingReports'
+import { SAMPLE_REPORTS, FALLBACK_PHOTO, type MissingReport, type ReportStatus } from '../data/missingReports'
 
 const STATUS_STYLE: Record<ReportStatus, { bg: string; fg: string }> = {
   '진행중': { bg: '#FFF0EB', fg: '#E8521F' },
@@ -427,7 +427,8 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
                 <img
                   src={r.photo}
                   alt={r.petName}
-                  style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, objectFit: 'cover' }}
+                  onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_PHOTO }}
+                  style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, objectFit: 'cover', background: '#F5EFEA' }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>

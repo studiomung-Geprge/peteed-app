@@ -1,4 +1,4 @@
-import type { MissingReport, ReportStatus } from '../data/missingReports'
+import { FALLBACK_PHOTO, type MissingReport, type ReportStatus } from '../data/missingReports'
 
 interface Props {
   report: MissingReport
@@ -41,7 +41,12 @@ export default function ReportDetailModal({
       }}>
         {/* Hero photo */}
         <div style={{ position: 'relative' }}>
-          <img src={report.photo} alt={report.petName} style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
+          <img
+            src={report.photo}
+            alt={report.petName}
+            onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_PHOTO }}
+            style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block', background: '#F5EFEA' }}
+          />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,.42) 100%)' }} />
           <button onClick={onClose} style={{
             position: 'absolute', top: 12, right: 12,
