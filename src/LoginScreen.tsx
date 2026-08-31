@@ -181,11 +181,11 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           </div>
 
           {/* Scrollable content — vertically centred */}
-          <div className="pl-content" style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: '18%' }}>
+          <div className="pl-content" style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: '5%' }}>
 
             {/* ── PETEED Logo ── */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 16, animation: 'fadeUp .45s ease' }}>
-              <PeteedLogo size={270} showTagline />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 8, animation: 'fadeUp .45s ease' }}>
+              <PeteedLogo size={230} showTagline />
             </div>
 
             {/* ── Email / PW form, or the post-signup "check your email" state ── */}
@@ -215,7 +215,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               <>
                 {/* Mode heading */}
                 <p style={{
-                  textAlign: 'center', margin: '0 0 12px', animation: 'fadeUp .5s ease',
+                  textAlign: 'center', margin: '0 0 8px', animation: 'fadeUp .5s ease',
                   fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 900, fontSize: 17, color: '#1C1C1A',
                 }}>
                   {mode === 'login' ? '로그인' : '이메일로 회원가입'}
@@ -339,13 +339,13 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             </div>
 
             {/* Terms */}
-            <p style={{ fontSize: 10, color: '#BFA99E', textAlign: 'center', lineHeight: 1.6, marginTop: 14, fontFamily: "'Noto Sans KR',sans-serif" }}>
+            <p style={{ fontSize: 10, color: '#BFA99E', textAlign: 'center', lineHeight: 1.6, marginTop: 10, fontFamily: "'Noto Sans KR',sans-serif" }}>
               로그인 시 <span style={{ color: '#7A5C52', fontWeight: 700 }}>이용약관</span> 및{' '}
               <span style={{ color: '#7A5C52', fontWeight: 700 }}>개인정보처리방침</span>에 동의하게 됩니다
             </p>
 
             {/* Gov logo */}
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0 24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 16px' }}>
               <img
                 src="https://www.gb.go.kr/Main/Images/new/ko2025/layout/logo.png"
                 alt="경상북도 공식 로고"
