@@ -1,8 +1,9 @@
 import { useState, useEffect, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
-import { ensureMyPet } from './lib/petData'
+import { getMyPet, createMyPet, updateGuardianName } from './lib/petData'
 import LoginScreen from './LoginScreen'
+import OnboardingScreen from './OnboardingScreen'
 import QRModal from './QRModal'
 import PetPhotoCapture from './PetPhotoCapture'
 import { Icons } from './icons'
@@ -46,6 +47,11 @@ export default function App() {
   const [mapPopup, setMapPopup] = useState<null | string>(null)
   const [petPhoto, setPetPhoto] = useState('https://images.unsplash.com/photo-1736196674354-b5e918a64644?w=400&h=400&fit=crop&crop=face')
   const [petBreed, setPetBreed] = useState('사모예드 · 4세 · 남아(중성화) · MANDU')
+  const [petName, setPetName] = useState('만두')
+  const [guardianName, setGuardianName] = useState('죠지')
+  // null = not checked yet, true = real Supabase user with no pet on file
+  // (needs the one-time onboarding form), false = ready to show the app.
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null)
 
   // Pick up an existing Supabase session on load and keep it in sync.
   useEffect(() => {
@@ -57,16 +63,63 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  // On first login for a real Supabase user, provision (or fetch) their
-  // pet row so the passport card reflects a real database record.
+  // On login for a real Supabase user, check whether they already have a
+  // pet on file. If not, this is their first time in — show the onboarding
+  // form instead of a hardcoded "만두" placeholder.
   useEffect(() => {
-    if (!session?.user) return
-    ensureMyPet(session.user.id)
-      .then(pet => { if (pet?.photo_url) setPetPhoto(pet.photo_url) })
-      .catch(err => console.warn('ensureMyPet failed:', err))
+    if (!session?.user) { setNeedsOnboarding(false); return }
+    getMyPet(session.user.id)
+      .then(pet => {
+        if (pet) {
+          setPetName(pet.name)
+          if (pet.photo_url) setPetPhoto(pet.photo_url)
+          setNeedsOnboarding(false)
+        } else {
+          setNeedsOnboarding(true)
+        }
+      })
+      .catch(err => { console.warn('getMyPet failed:', err); setNeedsOnboarding(false) })
   }, [session?.user?.id])
 
+  const handleOnboardingComplete = async (newGuardianName: string, newPetName: string) => {
+    if (!session?.user) return
+    try {
+      await Promise.all([
+        updateGuardianName(session.user.id, newGuardianName),
+        createMyPet(session.user.id, newPetName),
+      ])
+      setGuardianName(newGuardianName)
+      setPetName(newPetName)
+      setNeedsOnboarding(false)
+    } catch (err) {
+      console.warn('onboarding save failed:', err)
+      // Don't strand the user on the form if the DB write fails — let them
+      // into the app with the name they just typed; it just won't be saved.
+      setGuardianName(newGuardianName)
+      setPetName(newPetName)
+      setNeedsOnboarding(false)
+    }
+  }
+
   if (!loggedIn) return <LoginScreen onLogin={() => setDemoLoggedIn(true)} />
+
+  if (needsOnboarding) return <OnboardingScreen onComplete={handleOnboardingComplete} />
+
+  // Real Supabase session, but we haven't finished checking for an existing
+  // pet yet — avoid flashing the placeholder "만두" home screen before we
+  // know whether onboarding is actually needed.
+  if (session?.user && needsOnboarding === null) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div className="pl-device">
+          <div className="pl-screen" style={{ background: '#FFF8F5', alignItems: 'center', justifyContent: 'center', display: 'flex' }}>
+            <span style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid #FFD9CB', borderTopColor: '#FF6B4A', display: 'inline-block', animation: 'app-spin .7s linear infinite' }} />
+            <style>{`@keyframes app-spin { to { transform: rotate(360deg) } }`}</style>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const switchTab = (tab: TabId) => setActiveTab(tab)
 
@@ -86,7 +139,7 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div className="pl-device">
         <div className="pl-screen">
-          {showQR && <QRModal onClose={() => setShowQR(false)} />}
+          {showQR && <QRModal onClose={() => setShowQR(false)} petName={petName} petPhoto={petPhoto} guardianName={guardianName} />}
           {showCamera && <PetPhotoCapture onClose={() => setShowCamera(false)} onRegister={handleRegister} />}
           {govIdModal && <GovIdModal guardian={govIdModal} onClose={() => setGovIdModal(null)} />}
           {healthRecord !== null && <HealthRecordModal id={healthRecord} onClose={() => setHealthRecord(null)} />}
@@ -114,6 +167,8 @@ export default function App() {
               <HomeTab
                 petPhoto={petPhoto}
                 petBreed={petBreed}
+                petName={petName}
+                guardianName={guardianName}
                 onPhotoClick={() => setShowCamera(true)}
                 onQRClick={() => setShowQR(true)}
                 onViewAllClick={() => switchTab('health')}
@@ -123,6 +178,9 @@ export default function App() {
 
             <div className={`pl-page${activeTab === 'wallet' ? ' active' : ''}`}>
               <WalletTab
+                petName={petName}
+                petPhoto={petPhoto}
+                guardianName={guardianName}
                 onQRClick={() => setShowQR(true)}
                 onSelectRecord={id => setHealthRecord(id)}
                 onSelectGuardian={g => setGovIdModal(g)}

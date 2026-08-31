@@ -1,6 +1,9 @@
 import StampBadges from '../StampBadges'
 
 interface Props {
+  petName: string
+  petPhoto: string
+  guardianName: string
   onQRClick: () => void
   onSelectRecord: (id: number) => void
   onSelectGuardian: (g: 'A' | 'B') => void
@@ -45,11 +48,11 @@ const PulseIcon = (color: string) => (
   </svg>
 )
 
-export default function WalletTab({ onQRClick, onSelectRecord, onSelectGuardian }: Props) {
+export default function WalletTab({ petName, petPhoto, guardianName, onQRClick, onSelectRecord, onSelectGuardian }: Props) {
   return (
     <>
       <p className="eyebrow">PETEED</p>
-      <h1 className="page-title">만두의 ID</h1>
+      <h1 className="page-title">{petName}의 ID</h1>
       <p className="sub">PETEED에서 발급한 반려동물 디지털 신분증이에요</p>
 
       <div className="passport-card">
@@ -60,13 +63,13 @@ export default function WalletTab({ onQRClick, onSelectRecord, onSelectGuardian 
           <div className="status-chip">GPET-2026-000124</div>
         </div>
         <div className="passport-body">
-          <img className="pet-photo" src="https://images.unsplash.com/photo-1736196674354-b5e918a64644?w=400&h=400&fit=crop&crop=face" alt="만두" />
+          <img className="pet-photo" src={petPhoto} alt={petName} />
           <div className="pet-id-info">
-            <p className="pet-name">만두</p>
+            <p className="pet-name">{petName}</p>
             <p className="pet-breed">사모예드 · 2022.05.06생</p>
             <div className="id-row"><span>동물등록번호</span><b>41000-1234567</b></div>
             <div className="id-row"><span>최초등록일</span><b>2024.05.06</b></div>
-            <div className="id-row"><span>보호자</span><b>죠지</b></div>
+            <div className="id-row"><span>보호자</span><b>{guardianName}</b></div>
           </div>
         </div>
         <div className="passport-foot">
@@ -113,7 +116,7 @@ export default function WalletTab({ onQRClick, onSelectRecord, onSelectGuardian 
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
             </svg>
           </div>
-          <div style={{ flex: 1 }}><p className="row-title">보호자 A · 죠지 (주보호자)</p><p className="row-sub">010-xxxx-xxxx · 정부24 연동</p></div>
+          <div style={{ flex: 1 }}><p className="row-title">보호자 A · {guardianName} (주보호자)</p><p className="row-sub">010-xxxx-xxxx · 정부24 연동</p></div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </div>

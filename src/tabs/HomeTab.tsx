@@ -4,6 +4,8 @@ import { Icons } from '../icons'
 interface Props {
   petPhoto: string
   petBreed: string
+  petName: string
+  guardianName: string
   onPhotoClick: () => void
   onQRClick: () => void
   onViewAllClick: () => void
@@ -34,12 +36,12 @@ function QRCode({ size = 50 }: { size?: number }) {
   )
 }
 
-export default function HomeTab({ petPhoto, petBreed, onPhotoClick, onQRClick, onViewAllClick, onLogout }: Props) {
+export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onPhotoClick, onQRClick, onViewAllClick, onLogout }: Props) {
   return (
     <>
       <p className="eyebrow">GYEONGSANGBUK-DO · PETEED</p>
-      <h1 className="page-title">안녕하세요, 죠지 보호자님</h1>
-      <p className="sub">경상북도 안동시 · 오늘도 만두와 좋은 하루 보내세요</p>
+      <h1 className="page-title">안녕하세요, {guardianName} 보호자님</h1>
+      <p className="sub">경상북도 안동시 · 오늘도 {petName}와 좋은 하루 보내세요</p>
 
       <div className="passport-card">
         <div className="passport-top">
@@ -51,7 +53,7 @@ export default function HomeTab({ petPhoto, petBreed, onPhotoClick, onQRClick, o
         <div className="passport-body">
           <div style={{ flexShrink: 0 }}>
             <div style={{ position: 'relative', cursor: 'pointer' }} onClick={onPhotoClick}>
-              <img className="pet-photo" src={petPhoto} alt="만두" />
+              <img className="pet-photo" src={petPhoto} alt={petName} />
               <div style={{
                 position: 'absolute', inset: 0, borderRadius: 15,
                 background: 'rgba(0,0,0,.38)',
@@ -80,7 +82,7 @@ export default function HomeTab({ petPhoto, petBreed, onPhotoClick, onQRClick, o
             </div>
           </div>
           <div className="pet-id-info">
-            <p className="pet-name">만두</p>
+            <p className="pet-name">{petName}</p>
             <p className="pet-breed">{petBreed}</p>
             <div className="id-row"><span>동물등록번호</span><b>41000-1234567</b></div>
             <div className="id-row"><span>PETEED</span><b>GPET-2026-000124</b></div>

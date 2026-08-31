@@ -12,12 +12,13 @@ function randomRegistrationNumber() {
   return `41000-${suffix}`
 }
 
-// The prototype's UI is built around a single "만두" pet profile. On first
-// login for a given Supabase user we provision a real `pets` row + a
-// `pet_guardians` link so the account has an actual database-backed pet
-// instead of hardcoded mock data. On every later login we just look the
-// existing row up.
-export async function ensureMyPet(userId: string): Promise<MyPet | null> {
+// The prototype's UI is built around a single pet profile per guardian. On
+// first login for a given Supabase user, App.tsx checks getMyPet() — if it
+// returns null, the user hasn't provided their guardian/pet name yet, so we
+// show an onboarding screen. Submitting it calls createMyPet() with the real
+// name instead of a hardcoded placeholder. On every later login, getMyPet()
+// just looks the existing row up.
+export async function getMyPet(userId: string): Promise<MyPet | null> {
   if (!supabase) return null
 
   const { data: existing, error: fetchErr } = await supabase
@@ -29,11 +30,16 @@ export async function ensureMyPet(userId: string): Promise<MyPet | null> {
 
   if (fetchErr) throw fetchErr
   if (existing && (existing as any).pets) return (existing as any).pets as MyPet
+  return null
+}
+
+export async function createMyPet(userId: string, name: string): Promise<MyPet> {
+  if (!supabase) throw new Error('Supabase is not configured in this environment')
 
   const { data: pet, error: petErr } = await supabase
     .from('pets')
     .insert({
-      name: '만두',
+      name,
       breed: '사모예드',
       breed_en: 'Samoyed',
       gender: 'male_neutered',
@@ -51,6 +57,12 @@ export async function ensureMyPet(userId: string): Promise<MyPet | null> {
   if (linkErr) throw linkErr
 
   return pet as MyPet
+}
+
+export async function updateGuardianName(userId: string, fullName: string): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase.from('profiles').update({ full_name: fullName }).eq('id', userId)
+  if (error) throw error
 }
 
 export interface FacilityRow {

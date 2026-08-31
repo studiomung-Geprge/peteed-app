@@ -2,9 +2,12 @@ import StampBadges from './StampBadges'
 
 interface QRModalProps {
   onClose: () => void
+  petName: string
+  petPhoto: string
+  guardianName: string
 }
 
-export default function QRModal({ onClose }: QRModalProps) {
+export default function QRModal({ onClose, petName, petPhoto, guardianName }: QRModalProps) {
   return (
     <div
       onClick={onClose}
@@ -75,17 +78,17 @@ export default function QRModal({ onClose }: QRModalProps) {
           {/* Pet info row */}
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
             <img
-              src="https://images.unsplash.com/photo-1736196674354-b5e918a64644?w=400&h=400&fit=crop&crop=face"
-              alt="만두"
+              src={petPhoto}
+              alt={petName}
               style={{ width: 64, height: 64, borderRadius: 14, objectFit: 'cover', border: '2px solid rgba(234,208,155,.45)', flexShrink: 0 }}
             />
             <div>
-              <div style={{ fontFamily: "'Noto Sans KR', sans-serif", fontWeight: 900, fontSize: 20, marginBottom: 3 }}>만두</div>
+              <div style={{ fontFamily: "'Noto Sans KR', sans-serif", fontWeight: 900, fontSize: 20, marginBottom: 3 }}>{petName}</div>
               <div style={{ fontSize: 11, color: 'rgba(250,247,239,.65)', marginBottom: 8 }}>사모예드 · 2022.05.06생 · 남아(중성화)</div>
               <div style={{ fontSize: 10, color: 'rgba(250,247,239,.5)', display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span>등록번호 <span style={{ fontFamily: "'Roboto Mono', monospace", color: '#FAF7EF', fontWeight: 700 }}>41000-1234567</span></span>
                 <span>PETEED <span style={{ fontFamily: "'Roboto Mono', monospace", color: '#FAF7EF', fontWeight: 700 }}>GPET-2026-000124</span></span>
-                <span>보호자 <span style={{ fontFamily: "'Noto Sans KR', sans-serif", color: '#FAF7EF', fontWeight: 700 }}>죠지</span></span>
+                <span>보호자 <span style={{ fontFamily: "'Noto Sans KR', sans-serif", color: '#FAF7EF', fontWeight: 700 }}>{guardianName}</span></span>
               </div>
             </div>
           </div>
