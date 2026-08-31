@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import MissingReportModal from '../modals/MissingReportModal'
+import ReportDetailModal from '../modals/ReportDetailModal'
 import { SAMPLE_REPORTS, type MissingReport, type ReportStatus } from '../data/missingReports'
 
 const STATUS_STYLE: Record<ReportStatus, { bg: string; fg: string }> = {
@@ -34,6 +35,8 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
   // 실종/응급 신청 리스트 — 내가 접수한 신고가 맨 앞에 추가되고, 나머지는 샘플 데이터
   const [reports, setReports] = useState<MissingReport[]>(SAMPLE_REPORTS)
   const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null)
+  const [reportsExpanded, setReportsExpanded] = useState(false)
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
 
   const handleReported = (report: { id: string; location: string; notes: string }) => {
     const entry: MissingReport = {
@@ -46,6 +49,7 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
       reportedAt: '방금 전',
       notes: report.notes || undefined,
       mine: true,
+      photo: petPhoto,
     }
     setReports(prev => [entry, ...prev])
   }
@@ -56,6 +60,8 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
     setReports(prev => prev.map(r => (r.id === id ? { ...r, status: '발견완료', reportedAt: '방금 전' } : r)))
     setConfirmingCancelId(null)
   }
+
+  const selectedReport = reports.find(r => r.id === selectedReportId) ?? null
 
   useEffect(() => {
     setMapSrc(makeMapSrc(DEFAULT_LOCATION))
@@ -103,6 +109,18 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
           location={currentMapLocation}
           onReported={handleReported}
           onClose={() => setShowMissingModal(false)}
+        />
+      )}
+
+      {selectedReport && (
+        <ReportDetailModal
+          report={selectedReport}
+          mineActive={!!selectedReport.mine && selectedReport.status === '진행중'}
+          confirming={confirmingCancelId === selectedReport.id}
+          onRequestCancel={() => requestCancelReport(selectedReport.id)}
+          onDismissCancel={dismissCancelReport}
+          onConfirmCancel={() => confirmCancelReport(selectedReport.id)}
+          onClose={() => { setSelectedReportId(null); setConfirmingCancelId(null) }}
         />
       )}
 
@@ -390,38 +408,27 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
       {/* 실종/응급 신청 리스트 */}
       <div className="section-label">
         최근 실종 · 응급 신청
-        <span className="more">샘플</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
-        {reports.slice(0, 3).map(r => {
+        {(reportsExpanded ? reports : reports.slice(0, 3)).map(r => {
           const st = STATUS_STYLE[r.status]
           const confirming = confirmingCancelId === r.id
           const mineActive = r.mine && r.status === '진행중'
           return (
             <div
               key={r.id}
+              onClick={() => setSelectedReportId(r.id)}
               style={{
-                background: '#fff', borderRadius: 14, padding: '11px 12px',
+                background: '#fff', borderRadius: 14, padding: '11px 12px', cursor: 'pointer',
                 border: mineActive ? '1.5px solid rgba(255,107,74,.35)' : '1px solid var(--hair)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                  background: r.kind === '실종' ? '#FFF0EB' : '#FDEEEE',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {r.kind === '실종' ? (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E8521F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8342A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
-                    </svg>
-                  )}
-                </div>
+                <img
+                  src={r.photo}
+                  alt={r.petName}
+                  style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, objectFit: 'cover' }}
+                />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12.5, fontWeight: 800, color: '#1C1C1A' }}>{r.kind} · {r.petName}</span>
@@ -438,15 +445,23 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
                     {r.info} · {r.location}
                   </div>
                   {r.notes && (
-                    <div style={{ fontSize: 10, color: '#B8342A', marginTop: 3, lineHeight: 1.4 }}>“{r.notes}”</div>
+                    <div style={{
+                      fontSize: 10, color: '#B8342A', marginTop: 3, lineHeight: 1.4,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>“{r.notes}”</div>
                   )}
                 </div>
-                <span style={{ fontSize: 9.5, color: '#bbb', flexShrink: 0, marginTop: 1 }}>{r.reportedAt}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                  <span style={{ fontSize: 9.5, color: '#bbb', marginTop: 1 }}>{r.reportedAt}</span>
+                  <svg width="7" height="12" viewBox="0 0 8 14" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 1l6 6-6 6"/>
+                  </svg>
+                </div>
               </div>
 
               {mineActive && (
                 confirming ? (
-                  <div style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div onClick={e => e.stopPropagation()} style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <span style={{ fontSize: 10.5, color: '#7A5C52' }}>정말 찾으셨나요? 신고를 종료할게요</span>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button
@@ -469,7 +484,7 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
                   </div>
                 ) : (
                   <button
-                    onClick={() => requestCancelReport(r.id)}
+                    onClick={e => { e.stopPropagation(); requestCancelReport(r.id) }}
                     style={{
                       marginTop: 9, width: '100%', padding: '7px 0', borderRadius: 9,
                       border: '1.5px solid #1E9E5A', background: '#F2FBF6', color: '#1E9E5A',
@@ -482,6 +497,24 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
             </div>
           )
         })}
+
+        {reports.length > 3 && (
+          <button
+            onClick={() => setReportsExpanded(v => !v)}
+            style={{
+              width: '100%', padding: '9px 0', borderRadius: 10,
+              border: '1px solid var(--hair)', background: '#fff', color: '#888',
+              fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              fontFamily: "'Noto Sans KR', sans-serif",
+            }}
+          >
+            {reportsExpanded ? '접기' : `더보기 · ${reports.length - 3}건`}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: reportsExpanded ? 'rotate(180deg)' : 'none' }}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="section-label">응급 헌혈 매칭</div>
