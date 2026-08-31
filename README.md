@@ -56,10 +56,34 @@ npm run build
 - **연결 방식**: `src/lib/supabase.ts`가 `.env`의 `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`로
   클라이언트를 만듭니다. 두 값이 없으면 `SUPABASE_ENABLED`가 `false`가 되어 아래 "그레이스풀 폴백"이 동작합니다.
 - **인증**: `LoginScreen.tsx`의 이메일/비밀번호 로그인이 실제 `supabase.auth.signInWithPassword`를 호출합니다.
-  처음 보는 이메일이면 자동으로 `signUp`을 시도해서 별도 회원가입 화면 없이 바로 계정이 만들어집니다
-  (데모 편의를 위한 단순화이며, 실서비스에서는 이메일 인증 절차를 추가하는 걸 권장합니다).
-  카카오/네이버/구글 버튼은 실제 OAuth 프로바이더가 Supabase 대시보드에 설정되어 있지 않아
-  기존과 동일하게 시뮬레이션(즉시 로그인)으로 남아있습니다.
+  처음 보는 이메일이면 자동으로 `signUp`을 시도해서 별도 회원가입 화면 없이 바로 계정 생성이 진행됩니다.
+  Supabase 프로젝트의 **"Confirm email"(이메일 인증) 설정이 켜져 있으면** 가입 직후 실제 로그인 세션이
+  바로 생기지 않고, 화면에 "인증 메일을 보냈어요" 안내가 뜹니다 — 메일함에서 인증 링크를 눌러야 최종
+  로그인이 완료됩니다(링크를 누르면 앱으로 돌아와 자동으로 로그인 상태가 됩니다). 기존 계정에 틀린
+  비밀번호를 입력하면 더 이상 자동으로 로그인되지 않고 "비밀번호가 올바르지 않아요" 오류가 뜹니다.
+  이 인증 흐름이 실제로 동작하려면 Supabase 대시보드에서 아래 설정이 필요합니다:
+  - **Authentication → URL Configuration → Site URL**: 실서비스 배포 주소(예: `https://peteed-app-web.vercel.app`)
+  - **Authentication → URL Configuration → Redirect URLs**: 위 주소와 로컬 개발 주소를 추가
+    (예: `https://peteed-app-web.vercel.app/**`, `http://localhost:5173/**`)
+
+  **구글 버튼은 실제 `supabase.auth.signInWithOAuth({ provider: 'google' })`를 호출하도록
+  코드가 연결되어 있습니다.** 다만 Supabase 대시보드와 Google Cloud Console에서 아래 설정을
+  마쳐야 실제로 동작합니다 (안 되어 있으면 자동으로 기존 시뮬레이션으로 폴백합니다):
+  1. **Google Cloud Console** (https://console.cloud.google.com/apis/credentials) 에서
+     "OAuth 클라이언트 ID" 생성 (애플리케이션 유형: 웹 애플리케이션)
+     - 승인된 리디렉션 URI에 Supabase 콜백 주소 추가:
+       `https://aomtxgrrmdkvzwxllcys.supabase.co/auth/v1/callback`
+     - OAuth 동의 화면(Consent Screen)도 함께 설정해야 함 (테스트 중이면 "테스트 사용자"에
+       본인 이메일 추가)
+     - 생성 후 **클라이언트 ID**와 **클라이언트 보안 비밀(secret)** 복사
+  2. **Supabase 대시보드 → Authentication → Providers → Google** 에서 토글을 켜고
+     위에서 복사한 Client ID / Client Secret 붙여넣기 → Save
+  3. 배포된 앱(`https://peteed-app-web.vercel.app`)에서 "구글로 시작하기" 버튼을 누르면
+     실제 구글 로그인 화면으로 이동 → 로그인 후 앱으로 자동 복귀하며 세션 생성
+
+  카카오/네이버 버튼은 아직 시뮬레이션(즉시 로그인)으로 남아있습니다. 카카오는 구글과 동일한
+  방식(Supabase 기본 지원 프로바이더)으로 추가할 수 있고, 네이버는 Supabase가 기본 지원하지
+  않아 "Custom OAuth/OIDC Providers" 기능으로 별도 설정이 필요합니다.
 - **DB 스키마** (`public` 스키마, 전부 RLS 활성화):
   `profiles`(보호자), `pets`, `pet_guardians`(반려동물↔보호자 다대다), `health_records`,
   `facilities`(공공시설, 목업과 동일한 4곳 시드 완료), `facility_reservations`, `notifications`,
