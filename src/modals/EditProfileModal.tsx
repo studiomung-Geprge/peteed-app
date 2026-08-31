@@ -1,15 +1,20 @@
 import { useState } from 'react'
 
+export const BLOOD_TYPE_OPTIONS = ['DEA 1.1 양성', 'DEA 1.1 음성', '미검사'] as const
+export type BloodType = typeof BLOOD_TYPE_OPTIONS[number]
+
 interface Props {
   guardianName: string
   petName: string
+  bloodType: string
   onClose: () => void
-  onSave: (guardianName: string, petName: string) => void | Promise<void>
+  onSave: (guardianName: string, petName: string, bloodType: string) => void | Promise<void>
 }
 
-export default function EditProfileModal({ guardianName, petName, onClose, onSave }: Props) {
+export default function EditProfileModal({ guardianName, petName, bloodType, onClose, onSave }: Props) {
   const [name1, setName1] = useState(guardianName)
   const [name2, setName2] = useState(petName)
+  const [bt, setBt] = useState(bloodType)
   const [error1, setError1] = useState('')
   const [error2, setError2] = useState('')
   const [saving, setSaving] = useState(false)
@@ -22,7 +27,7 @@ export default function EditProfileModal({ guardianName, petName, onClose, onSav
 
     setSaving(true)
     try {
-      await onSave(name1.trim(), name2.trim())
+      await onSave(name1.trim(), name2.trim(), bt)
     } finally {
       setSaving(false)
     }
@@ -66,7 +71,7 @@ export default function EditProfileModal({ guardianName, petName, onClose, onSav
         }}>
           <div>
             <div style={{ color: 'white', fontWeight: 800, fontSize: 16, fontFamily: "'Noto Sans KR', sans-serif" }}>정보 수정</div>
-            <div style={{ color: 'rgba(255,255,255,.8)', fontSize: 11, marginTop: 2 }}>보호자 · 반려동물 이름을 바꿀 수 있어요</div>
+            <div style={{ color: 'rgba(255,255,255,.8)', fontSize: 11, marginTop: 2 }}>보호자 · 반려동물 이름과 혈액형을 바꿀 수 있어요</div>
           </div>
           <button onClick={onClose} style={{
             width: 26, height: 26, borderRadius: '50%',
@@ -113,6 +118,38 @@ export default function EditProfileModal({ guardianName, petName, onClose, onSav
               />
             </div>
             {error2 && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{error2}</p>}
+          </div>
+
+          <div>
+            <label style={{ display: 'block', margin: '0 0 6px 2px', fontFamily: "'Noto Sans KR',sans-serif", fontSize: 11.5, fontWeight: 700, color: '#7A5C52' }}>
+              혈액형
+            </label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {BLOOD_TYPE_OPTIONS.map(opt => {
+                const active = bt === opt
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setBt(opt)}
+                    style={{
+                      flex: 1, padding: '10px 4px', borderRadius: 12,
+                      border: active ? '1.8px solid #E8521F' : '1.8px solid #E8D5CE',
+                      background: active ? '#FFF0EB' : '#fff',
+                      color: active ? '#E8521F' : '#7A5C52',
+                      cursor: 'pointer',
+                      fontFamily: "'Noto Sans KR',sans-serif", fontSize: 11, fontWeight: 700,
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {opt}
+                  </button>
+                )
+              })}
+            </div>
+            <p style={{ fontSize: 10, color: '#A08A82', margin: '5px 4px 0', lineHeight: 1.5 }}>
+              반려견 수혈 시 가장 중요한 DEA 1.1 항원 기준이에요. 정확한 혈액형은 병원 검사로 확인해 주세요.
+            </p>
           </div>
 
           <button type="submit" disabled={saving} style={{

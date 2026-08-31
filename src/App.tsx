@@ -54,6 +54,9 @@ export default function App() {
   const [petBreed, setPetBreed] = useState('사모예드 · 4세 · 남아(중성화) · MANDU')
   const [petName, setPetName] = useState('만두')
   const [petId, setPetId] = useState<string | null>(null)
+  // Sample value — there's no blood_type column in the `pets` table yet, so
+  // this is edited locally only (like petBreed) rather than persisted.
+  const [petBloodType, setPetBloodType] = useState('DEA 1.1 양성')
   const [guardianName, setGuardianName] = useState('죠지')
   const [showEditProfile, setShowEditProfile] = useState(false)
   // null = not checked yet, true = real Supabase user with no pet on file
@@ -111,7 +114,7 @@ export default function App() {
     }
   }
 
-  const handleEditProfileSave = async (newGuardianName: string, newPetName: string) => {
+  const handleEditProfileSave = async (newGuardianName: string, newPetName: string, newBloodType: string) => {
     if (session?.user) {
       try {
         const updates: Promise<unknown>[] = [updateGuardianName(session.user.id, newGuardianName)]
@@ -123,6 +126,7 @@ export default function App() {
     }
     setGuardianName(newGuardianName)
     setPetName(newPetName)
+    setPetBloodType(newBloodType)
     setShowEditProfile(false)
   }
 
@@ -199,6 +203,7 @@ export default function App() {
             <EditProfileModal
               guardianName={guardianName}
               petName={petName}
+              bloodType={petBloodType}
               onClose={() => setShowEditProfile(false)}
               onSave={handleEditProfileSave}
             />
@@ -240,6 +245,7 @@ export default function App() {
               <WalletTab
                 petName={petName}
                 petPhoto={petPhoto}
+                petBloodType={petBloodType}
                 guardianName={guardianName}
                 onQRClick={() => setShowQR(true)}
                 onSelectRecord={id => setHealthRecord(id)}

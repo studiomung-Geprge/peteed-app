@@ -3,11 +3,20 @@ import StampBadges from '../StampBadges'
 interface Props {
   petName: string
   petPhoto: string
+  petBloodType: string
   guardianName: string
   onQRClick: () => void
   onSelectRecord: (id: number) => void
   onSelectGuardian: (g: 'A' | 'B') => void
   onEditProfile: () => void
+}
+
+function DropIcon() {
+  return (
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+    </svg>
+  )
 }
 
 function EditIcon() {
@@ -58,7 +67,7 @@ const PulseIcon = (color: string) => (
   </svg>
 )
 
-export default function WalletTab({ petName, petPhoto, guardianName, onQRClick, onSelectRecord, onSelectGuardian, onEditProfile }: Props) {
+export default function WalletTab({ petName, petPhoto, petBloodType, guardianName, onQRClick, onSelectRecord, onSelectGuardian, onEditProfile }: Props) {
   return (
     <>
       <p className="eyebrow">PETEED</p>
@@ -90,7 +99,18 @@ export default function WalletTab({ petName, petPhoto, guardianName, onQRClick, 
         <div className="passport-body">
           <img className="pet-photo" src={petPhoto} alt={petName} />
           <div className="pet-id-info">
-            <p className="pet-name">{petName}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <p className="pet-name" style={{ margin: 0 }}>{petName}</p>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+                padding: '2px 7px', borderRadius: 20,
+                background: '#FDEEEE', color: '#B8342A',
+                fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
+              }}>
+                <DropIcon />
+                {petBloodType}
+              </span>
+            </div>
             <p className="pet-breed">사모예드 · 2022.05.06생</p>
             <div className="id-row"><span>동물등록번호</span><b>41000-1234567</b></div>
             <div className="id-row"><span>최초등록일</span><b>2024.05.06</b></div>
