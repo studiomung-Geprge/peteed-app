@@ -32,6 +32,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [emailError, setEmailError] = useState('')
   const [pwError, setPwError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState(false)
 
   const validate = () => {
     let ok = true
@@ -42,6 +43,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
   const submitAuth = async () => {
     if (!validate()) return
+    setPwError('')
+    setPendingConfirm(false)
     setLoading(true)
 
     if (!SUPABASE_ENABLED || !supabase) {
@@ -54,24 +57,60 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
       if (signInError) {
-        // Demo convenience: the first login with a given email creates the
-        // account, so there's no separate sign-up screen to build/test.
-        if (signInError.message.toLowerCase().includes('invalid login credentials')) {
-          const { error: signUpError } = await supabase.auth.signUp({ email, password })
-          if (signUpError) throw signUpError
-        } else {
-          throw signInError
+        const msg = signInError.message.toLowerCase()
+
+        if (msg.includes('email not confirmed')) {
+          // Account exists but hasn't clicked the confirmation link yet.
+          setLoading(false)
+          setPendingConfirm(true)
+          return
         }
+
+        if (msg.includes('invalid login credentials')) {
+          // Could be a brand-new email (demo convenience: first login with a
+          // given email creates the account, no separate sign-up screen) OR
+          // an existing account with a wrong password. Try sign-up to tell
+          // the two apart.
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: window.location.origin },
+          })
+          if (signUpError) {
+            if (signUpError.message.toLowerCase().includes('already registered')) {
+              setLoading(false)
+              setPwError('비밀번호가 올바르지 않아요')
+              return
+            }
+            throw signUpError
+          }
+          setLoading(false)
+          if (!signUpData.session) {
+            // Email confirmation is required — Supabase just sent the link.
+            setPendingConfirm(true)
+          } else {
+            onLogin()
+          }
+          return
+        }
+
+        throw signInError
       }
       setLoading(false)
       onLogin()
     } catch (err) {
-      // Network unreachable — e.g. a Claude Artifact preview's sandbox
-      // blocks calls to *.supabase.co — or another auth error. Fall back to
-      // demo mode instead of leaving the user stuck on a spinner.
-      console.warn('Supabase login failed, falling back to demo mode:', err)
+      const message = err instanceof Error ? err.message.toLowerCase() : ''
+      const isNetworkError = message.includes('fetch') || message.includes('network')
+      console.warn('Supabase auth error:', err)
       setLoading(false)
-      onLogin()
+      if (isNetworkError) {
+        // Supabase itself unreachable — e.g. a Claude Artifact preview's
+        // sandbox blocks calls to *.supabase.co. Fall back to demo mode
+        // instead of leaving the user stuck on a spinner.
+        onLogin()
+      } else {
+        setPwError('로그인에 실패했어요. 이메일과 비밀번호를 확인해 주세요')
+      }
     }
   }
 
@@ -137,61 +176,93 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               <PeteedLogo size={270} showTagline />
             </div>
 
-            {/* ── Email / PW form ── */}
-            <form onSubmit={e => { e.preventDefault(); submitAuth() }} style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'fadeUp .55s ease' }}>
-              <div>
-                <div className="pl-input-wrap">
-                  <input
-                    className={`pl-input${emailError ? ' error' : ''}`}
-                    type="email"
-                    placeholder="이메일 주소"
-                    value={email}
-                    onChange={e => { setEmail(e.target.value); setEmailError('') }}
-                    autoComplete="email"
-                  />
-                  {email && (
-                    <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#BFA99E', cursor: 'pointer' }}
-                      onClick={() => setEmail('')}>✕</span>
-                  )}
-                </div>
-                {emailError && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{emailError}</p>}
+            {/* ── Email / PW form, or the post-signup "check your email" state ── */}
+            {pendingConfirm ? (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                textAlign: 'center', padding: '22px 18px', borderRadius: 16,
+                background: '#FFF1EC', border: '1.5px solid #FFD9CB', animation: 'fadeUp .5s ease',
+              }}>
+                <span style={{ fontSize: 30 }}>📩</span>
+                <p style={{ margin: 0, fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 14, color: '#1C1C1A' }}>
+                  인증 메일을 보냈어요
+                </p>
+                <p style={{ margin: 0, fontFamily: "'Noto Sans KR',sans-serif", fontSize: 12.5, color: '#7A5C52', lineHeight: 1.6 }}>
+                  <strong>{email}</strong> 주소로 인증 링크를 보냈어요.<br />
+                  메일함에서 링크를 눌러 인증을 완료한 뒤 다시 로그인해 주세요.
+                </p>
+                <button
+                  onClick={() => setPendingConfirm(false)}
+                  className="login-submit-btn"
+                  style={{ marginTop: 6 }}
+                >
+                  다시 로그인하기
+                </button>
               </div>
+            ) : (
+              <>
+                <form onSubmit={e => { e.preventDefault(); submitAuth() }} style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'fadeUp .55s ease' }}>
+                  <div>
+                    <div className="pl-input-wrap">
+                      <input
+                        className={`pl-input${emailError ? ' error' : ''}`}
+                        type="email"
+                        placeholder="이메일 주소"
+                        value={email}
+                        onChange={e => { setEmail(e.target.value); setEmailError('') }}
+                        autoComplete="email"
+                      />
+                      {email && (
+                        <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#BFA99E', cursor: 'pointer' }}
+                          onClick={() => setEmail('')}>✕</span>
+                      )}
+                    </div>
+                    {emailError && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{emailError}</p>}
+                  </div>
 
-              <div>
-                <div className="pl-input-wrap">
-                  <input
-                    className={`pl-input${pwError ? ' error' : ''}`}
-                    type={showPw ? 'text' : 'password'}
-                    placeholder="비밀번호"
-                    value={password}
-                    onChange={e => { setPassword(e.target.value); setPwError('') }}
-                    autoComplete="current-password"
-                    style={{ paddingRight: 42 }}
-                  />
-                  <span onClick={() => setShowPw(v => !v)}
-                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                    {showPw ? <EyeOffIcon /> : <EyeIcon />}
+                  <div>
+                    <div className="pl-input-wrap">
+                      <input
+                        className={`pl-input${pwError ? ' error' : ''}`}
+                        type={showPw ? 'text' : 'password'}
+                        placeholder="비밀번호"
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); setPwError('') }}
+                        autoComplete="current-password"
+                        style={{ paddingRight: 42 }}
+                      />
+                      <span onClick={() => setShowPw(v => !v)}
+                        style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        {showPw ? <EyeOffIcon /> : <EyeIcon />}
+                      </span>
+                    </div>
+                    {pwError && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{pwError}</p>}
+                  </div>
+
+                  <div style={{ textAlign: 'right', marginTop: -2 }}>
+                    <span style={{ fontSize: 11.5, color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}>비밀번호 찾기</span>
+                  </div>
+
+                  <button type="submit" disabled={loading} className="login-submit-btn">
+                    {loading
+                      ? <><span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,.35)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin .7s linear infinite' }} />로그인 중…</>
+                      : '로그인'
+                    }
+                  </button>
+                </form>
+
+                <p style={{ textAlign: 'center', fontSize: 12, color: '#BFA99E', margin: '10px 0 0', animation: 'fadeUp .6s ease' }}>
+                  계정이 없으신가요?{' '}
+                  <span
+                    onClick={() => submitAuth()}
+                    style={{ color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}
+                    title="위 이메일·비밀번호를 입력한 뒤 눌러주세요 — 처음 가입하는 이메일이면 인증 메일이 발송됩니다"
+                  >
+                    이메일로 회원가입
                   </span>
-                </div>
-                {pwError && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{pwError}</p>}
-              </div>
-
-              <div style={{ textAlign: 'right', marginTop: -2 }}>
-                <span style={{ fontSize: 11.5, color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}>비밀번호 찾기</span>
-              </div>
-
-              <button type="submit" disabled={loading} className="login-submit-btn">
-                {loading
-                  ? <><span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,.35)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin .7s linear infinite' }} />로그인 중…</>
-                  : '로그인'
-                }
-              </button>
-            </form>
-
-            <p style={{ textAlign: 'center', fontSize: 12, color: '#BFA99E', margin: '10px 0 0', animation: 'fadeUp .6s ease' }}>
-              계정이 없으신가요?{' '}
-              <span onClick={() => submitAuth()} style={{ color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }} title="위 이메일·비밀번호를 입력한 뒤 눌러주세요 — 처음 가입하는 이메일이면 자동으로 계정이 생성됩니다">이메일로 회원가입</span>
-            </p>
+                </p>
+              </>
+            )}
 
             {/* Divider */}
             <div className="pl-divider" style={{ animation: 'fadeUp .65s ease' }}>
