@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { HEALTH_RECORDS, type HealthRecord } from './data/healthRecords'
+import type { HealthRecord } from './data/healthRecords'
 
 interface Props {
+  records: HealthRecord[]
   onSelectRecord: (id: number) => void
 }
 
@@ -66,8 +67,8 @@ function buildICS(records: HealthRecord[]) {
   return lines.join('\r\n')
 }
 
-function exportToGoogleCalendar() {
-  const ics = buildICS(HEALTH_RECORDS)
+function exportToGoogleCalendar(records: HealthRecord[]) {
+  const ics = buildICS(records)
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -79,7 +80,7 @@ function exportToGoogleCalendar() {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export default function HealthCalendar({ onSelectRecord }: Props) {
+export default function HealthCalendar({ records, onSelectRecord }: Props) {
   // Always open on the real current month, so "today" is on-screen by default.
   const today = useMemo(() => new Date(), [])
   const todayKey = `${today.getFullYear()}.${pad2(today.getMonth() + 1)}.${pad2(today.getDate())}`
@@ -91,13 +92,13 @@ export default function HealthCalendar({ onSelectRecord }: Props) {
 
   const recordsByDay = useMemo(() => {
     const map = new Map<string, { rec: HealthRecord; id: number }[]>()
-    HEALTH_RECORDS.forEach((rec, id) => {
+    records.forEach((rec, id) => {
       const list = map.get(rec.date) ?? []
       list.push({ rec, id })
       map.set(rec.date, list)
     })
     return map
-  }, [])
+  }, [records])
 
   const year = viewMonth.getFullYear()
   const month = viewMonth.getMonth()
@@ -148,7 +149,7 @@ export default function HealthCalendar({ onSelectRecord }: Props) {
         </div>
 
         <button
-          onClick={() => { exportToGoogleCalendar(); setShowSyncInfo(true) }}
+          onClick={() => { exportToGoogleCalendar(records); setShowSyncInfo(true) }}
           title="전체 건강기록을 구글 캘린더로 내보내기"
           style={{
             display: 'flex', alignItems: 'center', gap: 5,

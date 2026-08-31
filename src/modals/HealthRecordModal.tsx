@@ -1,9 +1,9 @@
-import { HEALTH_RECORDS } from '../data/healthRecords'
+import type { HealthRecord } from '../data/healthRecords'
 
-interface Props { id: number; onClose: () => void }
+interface Props { id: number; records: HealthRecord[]; onClose: () => void }
 
-export default function HealthRecordModal({ id, onClose }: Props) {
-  const rec = HEALTH_RECORDS[id]
+export default function HealthRecordModal({ id, records, onClose }: Props) {
+  const rec = records[id]
   if (!rec) return null
   const chipColors: Record<string, string> = { '진료': 'var(--ink)', '예방접종': 'var(--teal)', '처방': 'var(--gold)' }
   const chipColor = chipColors[rec.type] ?? 'var(--ink)'

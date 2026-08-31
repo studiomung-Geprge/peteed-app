@@ -1,21 +1,22 @@
 import HealthCalendar from '../HealthCalendar'
-import { HEALTH_RECORDS } from '../data/healthRecords'
+import type { HealthRecord } from '../data/healthRecords'
 
 interface Props {
+  records: HealthRecord[]
   onOpenCamera: () => void
   onSelectRecord: (id: number) => void
 }
 
 const CHIP_CLASS: Record<string, string> = { '진료': 'ink', '예방접종': 'teal', '처방': 'gold' }
 
-export default function HealthTab({ onOpenCamera, onSelectRecord }: Props) {
+export default function HealthTab({ records, onOpenCamera, onSelectRecord }: Props) {
   return (
     <>
       <p className="eyebrow">HEALTH RECORD</p>
       <h1 className="page-title">건강기록</h1>
       <p className="sub">진료 서류를 촬영하면 AI가 자동으로 정리해요</p>
 
-      <HealthCalendar onSelectRecord={onSelectRecord} />
+      <HealthCalendar records={records} onSelectRecord={onSelectRecord} />
 
       <div className="flow-cta" style={{ cursor: 'pointer' }} onClick={onOpenCamera}>
         <div className="ic">
@@ -38,7 +39,7 @@ export default function HealthTab({ onOpenCamera, onSelectRecord }: Props) {
       </div>
 
       <div className="section-label">최근 기록</div>
-      {HEALTH_RECORDS.map((rec, id) => (
+      {records.map((rec, id) => (
         <div key={id} className="tl-item" style={{ alignItems: 'center' }}>
           <div className="tl-dot" />
           <div style={{ flex: 1 }}>

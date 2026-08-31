@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import PeteedLogo from './PeteedLogo'
+import type { HealthRecord } from './data/healthRecords'
 
 const SvgCamera = ({ size = 28 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -14,46 +15,26 @@ const SvgGallery = ({ size = 24 }: { size?: number }) => (
     <polyline points="21 15 16 10 5 21"/>
   </svg>
 )
-
-function GeminiLogo() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="gem1" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#4285F4"/>
-          <stop offset="50%" stopColor="#9B72CB"/>
-          <stop offset="100%" stopColor="#D96570"/>
-        </linearGradient>
-      </defs>
-      <path d="M24 4 C24 4 26.5 16 36 24 C26.5 32 24 44 24 44 C24 44 21.5 32 12 24 C21.5 16 24 4 24 4Z" fill="url(#gem1)"/>
-      <path d="M24 10 C24 10 25.5 18 32 24 C25.5 30 24 38 24 38 C24 38 22.5 30 16 24 C22.5 18 24 10 24 10Z" fill="white" opacity="0.25"/>
-    </svg>
-  )
-}
-const SvgPaw = () => (
+const SvgDoc = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="7" cy="7" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="17" cy="7" r="1.5"/>
-    <path d="M12 22c-3 0-7-3-7-8a5 5 0 0 1 10 0c0 5-4 8-7 8z"/>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
   </svg>
 )
-const SvgCake = () => (
+const SvgHospital = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/>
-    <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2 1 2 1"/>
-    <path d="M2 21h20M12 3v4M10 5l2-2 2 2"/>
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
   </svg>
 )
-const SvgGender = () => (
+const SvgCalendarIc = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="10" cy="14" r="5"/>
-    <path d="M19 5l-5.5 5.5M15 5h4v4"/>
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
   </svg>
 )
-const SvgWeight = () => (
+const SvgPill = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 2h12l2 6H4L6 2z"/>
-    <path d="M4 8l1 12h14l1-12"/>
-    <path d="M10 12h4"/>
+    <rect x="4.5" y="4.5" width="15" height="15" rx="7.5" transform="rotate(45 12 12)"/><line x1="8" y1="16" x2="16" y2="8"/>
   </svg>
 )
 const SvgInfo = () => (
@@ -64,38 +45,85 @@ const SvgInfo = () => (
   </svg>
 )
 
-interface AiResult {
-  breed: string
-  breedEn: string
-  age: string
-  gender: string
-  weight: string
+interface DocPreset {
+  docType: string
+  type: '진료' | '예방접종' | '처방'
+  title: string
+  hospital: string
+  vet: string
+  details: { label: string; value: string; icon: 'hospital' | 'calendar' | 'pill' | 'doc' }[]
+  memo: string
   confidence: number
-  traits: string[]
 }
 
-interface PetPhotoCaptureProps {
-  onClose: () => void
-  onRegister: (photo: string, result: AiResult) => void
-}
+const TYPE_COLOR: Record<string, string> = { '진료': 'var(--ink)', '예방접종': 'var(--teal)', '처방': 'var(--gold)' }
 
-// Simulated AI breed detection — cycles through realistic results based on image hash
-const AI_PRESETS: AiResult[] = [
-  { breed: '사모예드', breedEn: 'Samoyed', age: '3~4세 추정', gender: '남아', weight: '20~25kg 추정', confidence: 96, traits: ['대형견','온순한 성격','활동적','털 관리 필요'] },
-  { breed: '포메라니안', breedEn: 'Pomeranian', age: '2~3세 추정', gender: '여아', weight: '2~3kg 추정', confidence: 91, traits: ['소형견','활발한 성격','털 많음','훈련 용이'] },
-  { breed: '비숑프리제', breedEn: 'Bichon Frisé', age: '1~2세 추정', gender: '남아', weight: '4~6kg 추정', confidence: 88, traits: ['소형견','친화적','저알레르기','그루밍 필요'] },
-  { breed: '시바이누', breedEn: 'Shiba Inu', age: '4~5세 추정', gender: '남아', weight: '8~10kg 추정', confidence: 96, traits: ['중형견','독립적 성격','운동 필요','청결함'] },
+// Simulated OCR document classification — cycles through realistic vet-document results.
+const DOC_PRESETS: DocPreset[] = [
+  {
+    docType: '진단서', type: '진료', title: '정기 진료 소견서',
+    hospital: '중앙동물병원', vet: '최유나 수의사', confidence: 94,
+    details: [
+      { label: '진단명', value: '경미한 피부염 (좌측 옆구리)', icon: 'doc' },
+      { label: '처치 내용', value: '국소 소독 및 연고 처방', icon: 'hospital' },
+      { label: '다음 내원', value: '2주 후 경과 관찰', icon: 'calendar' },
+    ],
+    memo: '증상 악화 시 즉시 내원 바랍니다. 환부 긁지 않도록 넥카라 권장.',
+  },
+  {
+    docType: '접종증명서', type: '예방접종', title: '켄넬코프 예방접종 증명서',
+    hospital: '해피동물병원', vet: '정다운 수의사', confidence: 97,
+    details: [
+      { label: '접종 항목', value: '켄넬코프 (Bordetella)', icon: 'doc' },
+      { label: '백신 제조사', value: 'Bronchi-Shield III', icon: 'hospital' },
+      { label: '다음 접종', value: '1년 후', icon: 'calendar' },
+    ],
+    memo: '접종 후 발열·기력저하 등 이상 반응 시 병원에 문의해 주세요.',
+  },
+  {
+    docType: '처방전', type: '처방', title: '피부 소양증 처방전',
+    hospital: '중앙동물병원', vet: '최유나 수의사', confidence: 92,
+    details: [
+      { label: '처방약', value: '항히스타민제 10일분', icon: 'pill' },
+      { label: '복용법', value: '1일 1회, 아침 공복', icon: 'doc' },
+      { label: '유효기간', value: '처방일로부터 30일', icon: 'calendar' },
+    ],
+    memo: '복용 후 구토·설사 등 증상 있으면 복용 중단 후 문의하세요.',
+  },
+  {
+    docType: '예약증', type: '진료', title: '슬개골 재검진 예약증',
+    hospital: '안동동물병원', vet: '김민준 수의사', confidence: 90,
+    details: [
+      { label: '예약 일시', value: '2주 후 오후 2시', icon: 'calendar' },
+      { label: '예약 항목', value: '슬개골 경과 관찰', icon: 'doc' },
+      { label: '준비 사항', value: '공복 상태로 내원', icon: 'hospital' },
+    ],
+    memo: '예약 변경은 하루 전까지 병원에 연락 바랍니다.',
+  },
 ]
 
-export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCaptureProps) {
+const ICONS = { hospital: <SvgHospital />, calendar: <SvgCalendarIc />, pill: <SvgPill />, doc: <SvgDoc /> }
+
+function todayLabel() {
+  const d = new Date()
+  const pad2 = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`
+}
+
+interface Props {
+  onClose: () => void
+  onRegister: (record: HealthRecord) => void
+}
+
+export default function HealthDocCapture({ onClose, onRegister }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [phase, setPhase] = useState<'select' | 'analyzing' | 'result'>('select')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
-  const [result, setResult] = useState<AiResult | null>(null)
+  const [preset, setPreset] = useState<DocPreset | null>(null)
   const [analysisStep, setAnalysisStep] = useState(0)
 
-  const STEPS = ['이미지 전처리 중…', '견종 특징 추출 중…', 'AI 모델 분석 중…', '나이·체형 추정 중…', '분석 완료!']
+  const STEPS = ['이미지 전처리 중…', '문서 텍스트 인식(OCR) 중…', '병원·날짜 정보 추출 중…', '진료 항목 자동 분류 중…', '분석 완료!']
 
   const handleFile = (file: File) => {
     const url = URL.createObjectURL(file)
@@ -104,7 +132,6 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
     setProgress(0)
     setAnalysisStep(0)
 
-    // Simulate progressive analysis
     let step = 0
     let prog = 0
     const stepInterval = setInterval(() => {
@@ -122,8 +149,8 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
         setAnalysisStep(STEPS.length - 1)
         setProgress(100)
         setTimeout(() => {
-          const preset = AI_PRESETS[Math.floor(Math.random() * AI_PRESETS.length)]
-          setResult(preset)
+          const chosen = DOC_PRESETS[Math.floor(Math.random() * DOC_PRESETS.length)]
+          setPreset(chosen)
           setPhase('result')
         }, 400)
       }
@@ -132,6 +159,21 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
   }
 
   const triggerCamera = () => fileInputRef.current?.click()
+
+  const handleRegisterClick = () => {
+    if (!preset || !photoUrl) return
+    const record: HealthRecord = {
+      date: todayLabel(),
+      title: preset.title,
+      type: preset.type,
+      hospital: preset.hospital,
+      vet: preset.vet,
+      img: photoUrl,
+      details: preset.details.map(({ label, value }) => ({ label, value })),
+      memo: preset.memo,
+    }
+    onRegister(record)
+  }
 
   return (
     <div
@@ -149,7 +191,6 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
         @keyframes fadeIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes spin { to{transform:rotate(360deg)} }
         @keyframes pulse { 0%,100%{opacity:.5;transform:scale(.95)} 50%{opacity:1;transform:scale(1.05)} }
-        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
       `}</style>
 
       <div
@@ -172,7 +213,6 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
           onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }}
         />
 
-        {/* Handle bar */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--hair)' }} />
         </div>
@@ -183,21 +223,20 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '0 0 6px' }}>
               <PeteedLogo size={120} showTagline={false} />
               <h2 style={{ fontFamily: "'Noto Sans KR'", fontWeight: 900, fontSize: 18, color: 'var(--ink)', margin: '4px 0 0', textAlign: 'center' }}>
-                펫 사진 등록
+                건강기록 촬영
               </h2>
             </div>
-            <p style={{ fontSize: 12.5, color: 'var(--ink-70)', margin: '0 0 24px', lineHeight: 1.6 }}>
-              사진을 촬영하거나 업로드하면 AI가 견종·나이·체형을 자동으로 분석해 드려요
+            <p style={{ fontSize: 12.5, color: 'var(--ink-70)', margin: '0 0 24px', lineHeight: 1.6, textAlign: 'center' }}>
+              진단서 · 접종증명서 · 처방전 · 예약증을 촬영하면<br />AI가 자동으로 읽어서 정리해 드려요
             </p>
 
-            {/* AI feature highlight */}
             <div style={{
               borderRadius: 16, padding: '16px', marginBottom: 20,
               background: 'linear-gradient(135deg, var(--ink-2) 0%, var(--ink) 100%)',
               color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center',
             }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>AI 자동 인식 기능</div>
-              <div style={{ fontSize: 11, opacity: .8, lineHeight: 1.55 }}>견종 판별 · 나이 추정 · 체형 분석 · 특성 분류를 자동으로 처리하고 등록 정보를 추천해 드립니다</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>AI 문서 인식 기능</div>
+              <div style={{ fontSize: 11, opacity: .8, lineHeight: 1.55 }}>문서 종류 판별 · 병원명 추출 · 진료일 인식 · 진료 항목 자동 분류를 처리해 건강기록에 등록해 드립니다</div>
             </div>
 
             <button
@@ -211,7 +250,7 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
               }}
             >
               <span style={{ color: '#fff', display: 'flex' }}><SvgCamera size={36} /></span>
-              <span style={{ fontFamily: "'Noto Sans KR'", fontWeight: 700, fontSize: 15 }}>카메라로 촬영하기</span>
+              <span style={{ fontFamily: "'Noto Sans KR'", fontWeight: 700, fontSize: 15 }}>서류 촬영하기</span>
             </button>
 
             <button
@@ -238,17 +277,15 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
         {phase === 'analyzing' && photoUrl && (
           <div style={{ padding: '8px 24px 32px' }}>
             <h2 style={{ fontFamily: "'Noto Sans KR'", fontWeight: 900, fontSize: 20, color: 'var(--ink)', margin: '0 0 20px' }}>
-              AI 분석 중…
+              문서 분석 중…
             </h2>
 
-            {/* Photo preview */}
             <div style={{ position: 'relative', marginBottom: 20 }}>
               <img
                 src={photoUrl}
-                alt="업로드된 사진"
+                alt="촬영된 서류"
                 style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 16, display: 'block' }}
               />
-              {/* Scanning overlay */}
               <div style={{
                 position: 'absolute', inset: 0, borderRadius: 16,
                 background: 'linear-gradient(180deg, rgba(47,111,98,.2) 0%, transparent 100%)',
@@ -263,7 +300,6 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
               }} />
             </div>
 
-            {/* Steps */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
               {STEPS.map((step, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -286,7 +322,6 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
               ))}
             </div>
 
-            {/* Progress bar */}
             <div style={{ height: 6, borderRadius: 3, background: 'var(--paper-2)', overflow: 'hidden' }}>
               <div style={{
                 height: '100%', borderRadius: 3,
@@ -301,7 +336,7 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
         )}
 
         {/* ── PHASE: RESULT ── */}
-        {phase === 'result' && result && photoUrl && (
+        {phase === 'result' && preset && photoUrl && (
           <div style={{ overflowY: 'auto', padding: '8px 24px 32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
               <h2 style={{ fontFamily: "'Noto Sans KR'", fontWeight: 900, fontSize: 20, color: 'var(--ink)', margin: 0 }}>
@@ -313,11 +348,10 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
               }}>AI 인식</div>
             </div>
 
-            {/* Photo + breed badge */}
             <div style={{ position: 'relative', marginBottom: 16 }}>
               <img
                 src={photoUrl}
-                alt="펫 사진"
+                alt="촬영된 서류"
                 style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 16, display: 'block' }}
               />
               <div style={{
@@ -326,50 +360,70 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
                 borderRadius: 10, padding: '6px 12px', color: '#fff',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
-                <span style={{ color: '#fff' }}><SvgPaw /></span>
+                <span style={{ color: '#fff' }}><SvgDoc /></span>
                 <div>
-                  <div style={{ fontFamily: "'Noto Sans KR'", fontWeight: 700, fontSize: 13 }}>{result.breed}</div>
-                  <div style={{ fontSize: 10, opacity: .7 }}>{result.breedEn}</div>
+                  <div style={{ fontFamily: "'Noto Sans KR'", fontWeight: 700, fontSize: 13 }}>{preset.docType}</div>
+                  <div style={{ fontSize: 10, opacity: .7 }}>{preset.title}</div>
                 </div>
                 <div style={{
                   marginLeft: 6, padding: '2px 7px', borderRadius: 20,
                   background: 'rgba(201,154,61,.3)', color: '#EAD09B',
                   fontSize: 10, fontWeight: 700,
-                }}>신뢰도 {result.confidence}%</div>
+                }}>신뢰도 {preset.confidence}%</div>
               </div>
             </div>
 
-            {/* Confidence bar */}
             <div style={{ marginBottom: 16, padding: '12px 14px', background: '#fff', borderRadius: 14, border: '1px solid var(--hair)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink)' }}>AI 인식 신뢰도</span>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--teal)' }}>{result.confidence}%</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink)' }}>OCR 인식 신뢰도</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--teal)' }}>{preset.confidence}%</span>
               </div>
               <div style={{ height: 5, borderRadius: 3, background: 'var(--paper-2)' }}>
                 <div style={{
                   height: '100%', borderRadius: 3,
                   background: 'linear-gradient(90deg, var(--teal), var(--gold))',
-                  width: `${result.confidence}%`,
+                  width: `${preset.confidence}%`,
                 }} />
               </div>
             </div>
 
-            {/* Detected info */}
             <div style={{ background: '#fff', borderRadius: 14, border: '1px solid var(--hair)', marginBottom: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--hair)', fontSize: 11, fontWeight: 900, color: 'var(--ink-45)', letterSpacing: '.06em' }}>
-                AI 분석 결과 — 수정 후 등록 가능
+              <div style={{
+                padding: '10px 14px', borderBottom: '1px solid var(--hair)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--ink-45)', letterSpacing: '.06em' }}>
+                  AI 분석 결과 — 수정 후 등록 가능
+                </span>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
+                  background: TYPE_COLOR[preset.type], color: '#fff',
+                }}>{preset.type}</span>
               </div>
-              {[
-                { label: '견종', value: `${result.breed} (${result.breedEn})`, icon: <SvgPaw /> },
-                { label: '추정 나이', value: result.age, icon: <SvgCake /> },
-                { label: '성별', value: result.gender, icon: <SvgGender /> },
-                { label: '추정 체중', value: result.weight, icon: <SvgWeight /> },
-              ].map(({ label, value, icon }) => (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '11px 14px', borderBottom: '1px solid var(--hair)',
+              }}>
+                <span style={{ width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-70)' }}><SvgHospital /></span>
+                <span style={{ fontSize: 12, color: 'var(--ink-45)', flex: '0 0 70px' }}>병원</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', flex: 1 }}>{preset.hospital} · {preset.vet}</span>
+                <span style={{ fontSize: 10, color: 'var(--ink-45)' }}>수정 ›</span>
+              </div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '11px 14px', borderBottom: '1px solid var(--hair)',
+              }}>
+                <span style={{ width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-70)' }}><SvgCalendarIc /></span>
+                <span style={{ fontSize: 12, color: 'var(--ink-45)', flex: '0 0 70px' }}>인식 날짜</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', flex: 1 }}>{todayLabel()}</span>
+                <span style={{ fontSize: 10, color: 'var(--ink-45)' }}>수정 ›</span>
+              </div>
+              {preset.details.map(({ label, value, icon }) => (
                 <div key={label} style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '11px 14px', borderBottom: '1px solid var(--hair)',
                 }}>
-                  <span style={{ width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-70)' }}>{icon}</span>
+                  <span style={{ width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-70)' }}>{ICONS[icon]}</span>
                   <span style={{ fontSize: 12, color: 'var(--ink-45)', flex: '0 0 70px' }}>{label}</span>
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink)', flex: 1 }}>{value}</span>
                   <span style={{ fontSize: 10, color: 'var(--ink-45)' }}>수정 ›</span>
@@ -377,27 +431,12 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
               ))}
             </div>
 
-            {/* Trait chips */}
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-45)', margin: '0 0 8px', letterSpacing: '.04em' }}>AI 분석 특성</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {result.traits.map(t => (
-                  <span key={t} style={{
-                    fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                    background: 'var(--teal-light)', color: 'var(--teal)',
-                  }}>{t}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Disclaimer */}
             <p style={{ fontSize: 10.5, color: 'var(--ink-45)', lineHeight: 1.6, margin: '0 0 16px' }}>
-              <span style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle', color:'var(--ink-45)' }}><SvgInfo /></span>{' '}AI 분석 결과는 참고용이에요. 정확한 정보는 직접 수정하여 등록해 주세요.
+              <span style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle', color:'var(--ink-45)' }}><SvgInfo /></span>{' '}OCR 분석 결과는 참고용이에요. 정확한 정보는 직접 수정하여 등록해 주세요.
             </p>
 
-            {/* CTA buttons */}
             <button
-              onClick={() => onRegister(photoUrl, result)}
+              onClick={handleRegisterClick}
               style={{
                 width: '100%', border: 'none', borderRadius: 16, padding: '15px',
                 background: 'linear-gradient(135deg, var(--ink-2) 0%, var(--ink) 100%)',
@@ -406,10 +445,10 @@ export default function PetPhotoCapture({ onClose, onRegister }: PetPhotoCapture
                 boxShadow: '0 10px 24px -10px rgba(22,35,61,.5)',
               }}
             >
-              이 정보로 등록하기
+              이 정보로 건강기록에 추가하기
             </button>
             <button
-              onClick={() => { setPhase('select'); setPhotoUrl(null) }}
+              onClick={() => { setPhase('select'); setPhotoUrl(null); setPreset(null) }}
               style={{
                 width: '100%', border: '1.5px solid var(--hair)', borderRadius: 16, padding: '13px',
                 background: '#fff', color: 'var(--ink)', cursor: 'pointer',

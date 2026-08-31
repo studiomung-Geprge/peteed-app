@@ -2,10 +2,12 @@ import { useState, useEffect, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
 import { getMyPet, createMyPet, updateGuardianName, updatePetName, getGuardianName } from './lib/petData'
+import { HEALTH_RECORDS, type HealthRecord } from './data/healthRecords'
 import LoginScreen from './LoginScreen'
 import OnboardingScreen from './OnboardingScreen'
 import QRModal from './QRModal'
 import PetPhotoCapture from './PetPhotoCapture'
+import HealthDocCapture from './HealthDocCapture'
 import { Icons } from './icons'
 import HomeTab from './tabs/HomeTab'
 import WalletTab from './tabs/WalletTab'
@@ -43,6 +45,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showQR, setShowQR] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
+  const [showHealthCapture, setShowHealthCapture] = useState(false)
+  const [healthRecords, setHealthRecords] = useState<HealthRecord[]>(HEALTH_RECORDS)
   const [govIdModal, setGovIdModal] = useState<null | 'A' | 'B'>(null)
   const [healthRecord, setHealthRecord] = useState<null | number>(null)
   const [mapPopup, setMapPopup] = useState<null | string>(null)
@@ -156,10 +160,20 @@ export default function App() {
     setShowCamera(false)
   }
 
+  const handleHealthRecordAdd = (record: HealthRecord) => {
+    setHealthRecords(prev => {
+      const next = [...prev, record]
+      setHealthRecord(next.length - 1)
+      return next
+    })
+    setShowHealthCapture(false)
+    switchTab('health')
+  }
+
   const handleQuickAction = (key: 'health' | 'facilities' | 'missing' | 'blood') => {
     switch (key) {
       case 'health':
-        setShowCamera(true)
+        setShowHealthCapture(true)
         break
       case 'facilities':
         switchTab('facilities')
@@ -177,8 +191,9 @@ export default function App() {
         <div className="pl-screen">
           {showQR && <QRModal onClose={() => setShowQR(false)} petName={petName} petPhoto={petPhoto} guardianName={guardianName} />}
           {showCamera && <PetPhotoCapture onClose={() => setShowCamera(false)} onRegister={handleRegister} />}
+          {showHealthCapture && <HealthDocCapture onClose={() => setShowHealthCapture(false)} onRegister={handleHealthRecordAdd} />}
           {govIdModal && <GovIdModal guardian={govIdModal} onClose={() => setGovIdModal(null)} />}
-          {healthRecord !== null && <HealthRecordModal id={healthRecord} onClose={() => setHealthRecord(null)} />}
+          {healthRecord !== null && <HealthRecordModal id={healthRecord} records={healthRecords} onClose={() => setHealthRecord(null)} />}
           {mapPopup && <MapPopupModal location={mapPopup} onClose={() => setMapPopup(null)} />}
           {showEditProfile && (
             <EditProfileModal
@@ -235,7 +250,8 @@ export default function App() {
 
             <div className={`pl-page${activeTab === 'health' ? ' active' : ''}`}>
               <HealthTab
-                onOpenCamera={() => setShowCamera(true)}
+                records={healthRecords}
+                onOpenCamera={() => setShowHealthCapture(true)}
                 onSelectRecord={id => setHealthRecord(id)}
               />
             </div>
