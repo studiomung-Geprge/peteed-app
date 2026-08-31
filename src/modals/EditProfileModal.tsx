@@ -11,23 +11,32 @@ interface Props {
   onSave: (guardianName: string, petName: string, bloodType: string) => void | Promise<void>
 }
 
+const CUSTOM = '__custom__'
+
 export default function EditProfileModal({ guardianName, petName, bloodType, onClose, onSave }: Props) {
+  const isPresetBloodType = (BLOOD_TYPE_OPTIONS as readonly string[]).includes(bloodType)
+
   const [name1, setName1] = useState(guardianName)
   const [name2, setName2] = useState(petName)
-  const [bt, setBt] = useState(bloodType)
+  const [btMode, setBtMode] = useState<string>(isPresetBloodType ? bloodType : CUSTOM)
+  const [customBt, setCustomBt] = useState(isPresetBloodType ? '' : bloodType)
   const [error1, setError1] = useState('')
   const [error2, setError2] = useState('')
+  const [errorBt, setErrorBt] = useState('')
   const [saving, setSaving] = useState(false)
 
   const submit = async () => {
     let ok = true
     if (!name1.trim()) { setError1('보호자 이름을 입력해 주세요'); ok = false } else setError1('')
     if (!name2.trim()) { setError2('반려동물 이름을 입력해 주세요'); ok = false } else setError2('')
+    if (btMode === CUSTOM && !customBt.trim()) { setErrorBt('혈액형을 입력해 주세요'); ok = false } else setErrorBt('')
     if (!ok) return
+
+    const finalBloodType = btMode === CUSTOM ? customBt.trim() : btMode
 
     setSaving(true)
     try {
-      await onSave(name1.trim(), name2.trim(), bt)
+      await onSave(name1.trim(), name2.trim(), finalBloodType)
     } finally {
       setSaving(false)
     }
@@ -124,16 +133,17 @@ export default function EditProfileModal({ guardianName, petName, bloodType, onC
             <label style={{ display: 'block', margin: '0 0 6px 2px', fontFamily: "'Noto Sans KR',sans-serif", fontSize: 11.5, fontWeight: 700, color: '#7A5C52' }}>
               혈액형
             </label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {BLOOD_TYPE_OPTIONS.map(opt => {
-                const active = bt === opt
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {[...BLOOD_TYPE_OPTIONS, CUSTOM].map(opt => {
+                const active = btMode === opt
+                const label = opt === CUSTOM ? '직접 입력' : opt
                 return (
                   <button
                     key={opt}
                     type="button"
-                    onClick={() => setBt(opt)}
+                    onClick={() => { setBtMode(opt); setErrorBt('') }}
                     style={{
-                      flex: 1, padding: '10px 4px', borderRadius: 12,
+                      flex: '1 1 calc(50% - 3px)', padding: '10px 4px', borderRadius: 12,
                       border: active ? '1.8px solid #E8521F' : '1.8px solid #E8D5CE',
                       background: active ? '#FFF0EB' : '#fff',
                       color: active ? '#E8521F' : '#7A5C52',
@@ -142,13 +152,29 @@ export default function EditProfileModal({ guardianName, petName, bloodType, onC
                       transition: 'all .15s',
                     }}
                   >
-                    {opt}
+                    {label}
                   </button>
                 )
               })}
             </div>
+
+            {btMode === CUSTOM && (
+              <div className="ep-input-wrap" style={{ marginTop: 8 }}>
+                <input
+                  className={`ep-input${errorBt ? ' error' : ''}`}
+                  type="text"
+                  value={customBt}
+                  onChange={e => { setCustomBt(e.target.value); setErrorBt('') }}
+                  placeholder="예: DEA 4 양성, A형(고양이) 등"
+                  autoComplete="off"
+                  autoFocus
+                />
+              </div>
+            )}
+            {errorBt && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{errorBt}</p>}
+
             <p style={{ fontSize: 10, color: '#A08A82', margin: '5px 4px 0', lineHeight: 1.5 }}>
-              반려견 수혈 시 가장 중요한 DEA 1.1 항원 기준이에요. 정확한 혈액형은 병원 검사로 확인해 주세요.
+              반려견 수혈 시 가장 중요한 DEA 1.1 항원 기준이에요. 특이 혈액형은 직접 입력해 주세요. 정확한 혈액형은 병원 검사로 확인해 주세요.
             </p>
           </div>
 
