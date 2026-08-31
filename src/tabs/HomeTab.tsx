@@ -9,6 +9,7 @@ interface Props {
   onPhotoClick: () => void
   onQRClick: () => void
   onViewAllClick: () => void
+  onQuickAction: (key: 'health' | 'facilities' | 'missing' | 'blood') => void
   onLogout: () => void
 }
 
@@ -36,7 +37,7 @@ function QRCode({ size = 50 }: { size?: number }) {
   )
 }
 
-export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onPhotoClick, onQRClick, onViewAllClick, onLogout }: Props) {
+export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onPhotoClick, onQRClick, onViewAllClick, onQuickAction, onLogout }: Props) {
   return (
     <>
       <p className="eyebrow">GYEONGSANGBUK-DO · PETEED</p>
@@ -98,19 +99,31 @@ export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onP
 
       <div className="section-label">빠른 실행</div>
       <div className="quick-grid">
-        <div className="quick-item">
+        <div className="quick-item" role="button" tabIndex={0} style={{ cursor: 'pointer' }}
+          onClick={() => onQuickAction('health')}
+          onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onQuickAction('health')}
+        >
           <div className="quick-icon" style={{ background: 'var(--teal-light)' }}>{Icons.camera('#E8521F')}</div>
           <span className="quick-label">건강기록<br />추가</span>
         </div>
-        <div className="quick-item">
+        <div className="quick-item" role="button" tabIndex={0} style={{ cursor: 'pointer' }}
+          onClick={() => onQuickAction('facilities')}
+          onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onQuickAction('facilities')}
+        >
           <div className="quick-icon" style={{ background: 'var(--gold-light)' }}>{Icons.pin('#FF6B4A')}</div>
           <span className="quick-label">시설<br />예약</span>
         </div>
-        <div className="quick-item">
+        <div className="quick-item" role="button" tabIndex={0} style={{ cursor: 'pointer' }}
+          onClick={() => onQuickAction('missing')}
+          onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onQuickAction('missing')}
+        >
           <div className="quick-icon" style={{ background: 'var(--coral-light)' }}>{Icons.alert('#C1442E')}</div>
           <span className="quick-label">실종<br />신고</span>
         </div>
-        <div className="quick-item">
+        <div className="quick-item" role="button" tabIndex={0} style={{ cursor: 'pointer' }}
+          onClick={() => onQuickAction('blood')}
+          onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onQuickAction('blood')}
+        >
           <div className="quick-icon" style={{ background: 'var(--paper-2)' }}>{Icons.drop('#8B2020')}</div>
           <span className="quick-label">헌혈<br />매칭</span>
         </div>

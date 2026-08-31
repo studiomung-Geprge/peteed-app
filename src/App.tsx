@@ -156,6 +156,21 @@ export default function App() {
     setShowCamera(false)
   }
 
+  const handleQuickAction = (key: 'health' | 'facilities' | 'missing' | 'blood') => {
+    switch (key) {
+      case 'health':
+        setShowCamera(true)
+        break
+      case 'facilities':
+        switchTab('facilities')
+        break
+      case 'missing':
+      case 'blood':
+        switchTab('emergency')
+        break
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div className="pl-device">
@@ -201,6 +216,7 @@ export default function App() {
                 onPhotoClick={() => setShowCamera(true)}
                 onQRClick={() => setShowQR(true)}
                 onViewAllClick={() => switchTab('health')}
+                onQuickAction={handleQuickAction}
                 onLogout={handleLogout}
               />
             </div>
