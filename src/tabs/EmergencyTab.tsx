@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type PointerEvent as ReactPointerEvent } from 'react'
 import MissingReportModal from '../modals/MissingReportModal'
 
 const DEFAULT_LOCATION = '경상북도 의성군 의성읍 군청길 31 의성군청'
@@ -12,6 +12,8 @@ interface Props {
   onOpenMap: (location: string) => void
 }
 
+const CENTER_PIN = { x: 50, y: 46 }
+
 export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType, onOpenMap }: Props) {
   const [searchInput, setSearchInput] = useState('')
   const [searchedAddress, setSearchedAddress] = useState('')
@@ -20,6 +22,15 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
   const [activePin, setActivePin] = useState<'current' | 'searched'>('current')
   const [showMissingModal, setShowMissingModal] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Custom draggable pin overlaid on the map, so a searched-by-name result
+  // can be nudged to the exact spot rather than trusting the geocoder alone.
+  const mapAreaRef = useRef<HTMLDivElement>(null)
+  const draggingRef = useRef(false)
+  const [pinPos, setPinPos] = useState(CENTER_PIN)
+  const [draftPos, setDraftPos] = useState<{ x: number; y: number } | null>(null)
+  const [showLabelEditor, setShowLabelEditor] = useState(false)
+  const [labelDraft, setLabelDraft] = useState('')
 
   useEffect(() => {
     setMapSrc(makeMapSrc(DEFAULT_LOCATION))
@@ -33,12 +44,61 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
     setSearchedAddress(q)
     setActivePin('searched')
     setMapLoading(true)
+    setPinPos(CENTER_PIN)
+    setDraftPos(null)
+    setShowLabelEditor(false)
   }
 
   const handleCurrentLocation = () => {
     setMapSrc(makeMapSrc(DEFAULT_LOCATION))
     setActivePin('current')
     setMapLoading(true)
+    setPinPos(CENTER_PIN)
+    setDraftPos(null)
+    setShowLabelEditor(false)
+  }
+
+  const clampPct = (v: number) => Math.min(96, Math.max(4, v))
+
+  const posFromPointer = (e: { clientX: number; clientY: number }) => {
+    const el = mapAreaRef.current
+    if (!el) return CENTER_PIN
+    const rect = el.getBoundingClientRect()
+    return {
+      x: clampPct(((e.clientX - rect.left) / rect.width) * 100),
+      y: clampPct(((e.clientY - rect.top) / rect.height) * 100),
+    }
+  }
+
+  const handlePinPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    draggingRef.current = true
+    setDraftPos(posFromPointer(e))
+  }
+  const handlePinPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return
+    setDraftPos(posFromPointer(e))
+  }
+  const handlePinPointerUp = () => {
+    if (!draggingRef.current) return
+    draggingRef.current = false
+    setLabelDraft(searchedAddress)
+    setShowLabelEditor(true)
+  }
+
+  const confirmPinLabel = () => {
+    if (draftPos) setPinPos(draftPos)
+    const label = labelDraft.trim()
+    if (label) {
+      setSearchedAddress(label)
+      setActivePin('searched')
+    }
+    setShowLabelEditor(false)
+    setDraftPos(null)
+  }
+  const cancelPinLabel = () => {
+    setShowLabelEditor(false)
+    setDraftPos(null)
   }
 
   const currentMapLocation = activePin === 'searched' && searchedAddress ? searchedAddress : DEFAULT_LOCATION
@@ -209,50 +269,119 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
             referrerPolicy="no-referrer-when-downgrade"
           />
 
-          {/* Active pin badge */}
-          <div style={{
-            position: 'absolute', bottom: 10, left: 10,
-            background: activePin === 'current' ? 'rgba(37,99,235,.9)' : 'rgba(255,107,74,.9)',
-            borderRadius: 8, padding: '5px 9px',
-            display: 'flex', alignItems: 'center', gap: 5,
-            backdropFilter: 'blur(4px)',
-            boxShadow: '0 2px 8px rgba(0,0,0,.2)',
-            transition: 'background .3s',
-          }}>
-            {activePin === 'current' ? (
-              <>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'white', flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: 'white', fontWeight: 600 }}>현재 위치 · 의성군청</span>
-              </>
-            ) : (
-              <>
-                <svg width="8" height="10" viewBox="0 0 10 14" fill="white" style={{ flexShrink: 0 }}>
-                  <path d="M5 0C2.24 0 0 2.24 0 5c0 3.75 5 9 5 9s5-5.25 5-9c0-2.76-2.24-5-5-5zm0 6.5A1.5 1.5 0 1 1 5 3.5a1.5 1.5 0 0 1 0 3z"/>
+          {/* Draggable pin overlay — lets a name search result be nudged to
+              the exact spot instead of trusting the geocoder alone */}
+          {!mapLoading && (
+            <div
+              ref={mapAreaRef}
+              onPointerDown={handlePinPointerDown}
+              onPointerMove={handlePinPointerMove}
+              onPointerUp={handlePinPointerUp}
+              onPointerCancel={handlePinPointerUp}
+              style={{ position: 'absolute', inset: 0, zIndex: 1, cursor: 'grab', touchAction: 'none' }}
+            >
+              <div style={{
+                position: 'absolute',
+                left: `${(draftPos ?? pinPos).x}%`,
+                top: `${(draftPos ?? pinPos).y}%`,
+                transform: 'translate(-50%, -100%)',
+                pointerEvents: 'none',
+                transition: draftPos ? 'none' : 'left .18s ease, top .18s ease',
+              }}>
+                <svg width="28" height="36" viewBox="0 0 30 38" style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.35))' }}>
+                  <path d="M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z" fill={activePin === 'current' ? '#2563EB' : '#FF6B4A'}/>
+                  <circle cx="15" cy="15" r="6.5" fill="#fff"/>
                 </svg>
-                <span style={{ fontSize: 10, color: 'white', fontWeight: 600, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  검색 결과 · {searchedAddress}
-                </span>
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
 
-          {/* 지도에서 열기 → App 레벨 팝업 */}
-          <button
-            onClick={() => onOpenMap(currentMapLocation)}
-            style={{
-              position: 'absolute', bottom: 10, right: 10,
-              background: 'rgba(255,255,255,.92)', borderRadius: 8,
-              padding: '5px 9px', border: 'none', cursor: 'pointer',
+          {/* Pin label editor — appears right after the pin is dropped */}
+          {showLabelEditor && (
+            <div style={{
+              position: 'absolute', left: 8, right: 8, bottom: 8, zIndex: 6,
+              background: '#fff', borderRadius: 12, padding: 8,
+              boxShadow: '0 8px 22px rgba(0,0,0,.28)',
+              display: 'flex', flexDirection: 'column', gap: 6,
+            }}>
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: '#999', paddingLeft: 2 }}>이 위치를 무엇이라고 부를까요?</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  autoFocus
+                  value={labelDraft}
+                  onChange={e => setLabelDraft(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && confirmPinLabel()}
+                  placeholder="예: 정문 앞 화단, 놀이터 벤치"
+                  style={{
+                    flex: 1, border: '1.5px solid #E8D5CE', borderRadius: 8, padding: '7px 9px',
+                    fontSize: 11.5, outline: 'none', fontFamily: "'Noto Sans KR', sans-serif", color: '#1C1C1A',
+                  }}
+                />
+                <button onClick={cancelPinLabel} style={{
+                  padding: '0 10px', borderRadius: 8, border: '1.5px solid #E0E0E0',
+                  background: '#fff', color: '#888', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                }}>취소</button>
+                <button onClick={confirmPinLabel} style={{
+                  padding: '0 12px', borderRadius: 8, border: 'none',
+                  background: 'linear-gradient(135deg,#FF6B4A,#E8521F)', color: '#fff',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                }}>설정</button>
+              </div>
+            </div>
+          )}
+
+          {/* Active pin badge — zIndex above the drag-capture overlay so it
+              stays visible and doesn't intercept its clicks */}
+          {!mapLoading && (
+            <div style={{
+              position: 'absolute', bottom: 10, left: 10, zIndex: 3,
+              background: activePin === 'current' ? 'rgba(37,99,235,.9)' : 'rgba(255,107,74,.9)',
+              borderRadius: 8, padding: '5px 9px',
               display: 'flex', alignItems: 'center', gap: 5,
-              boxShadow: '0 2px 8px rgba(0,0,0,.15)',
               backdropFilter: 'blur(4px)',
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-            </svg>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#4285F4' }}>지도에서 열기</span>
-          </button>
+              boxShadow: '0 2px 8px rgba(0,0,0,.2)',
+              transition: 'background .3s',
+              pointerEvents: 'none',
+            }}>
+              {activePin === 'current' ? (
+                <>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'white', flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, color: 'white', fontWeight: 600 }}>현재 위치 · 의성군청</span>
+                </>
+              ) : (
+                <>
+                  <svg width="8" height="10" viewBox="0 0 10 14" fill="white" style={{ flexShrink: 0 }}>
+                    <path d="M5 0C2.24 0 0 2.24 0 5c0 3.75 5 9 5 9s5-5.25 5-9c0-2.76-2.24-5-5-5zm0 6.5A1.5 1.5 0 1 1 5 3.5a1.5 1.5 0 0 1 0 3z"/>
+                  </svg>
+                  <span style={{ fontSize: 10, color: 'white', fontWeight: 600, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    검색 결과 · {searchedAddress}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 지도에서 열기 → App 레벨 팝업 (드래그 오버레이보다 위에 두어 클릭 가능하게 유지) */}
+          {!mapLoading && (
+            <button
+              onClick={() => onOpenMap(currentMapLocation)}
+              style={{
+                position: 'absolute', bottom: 10, right: 10, zIndex: 3,
+                background: 'rgba(255,255,255,.92)', borderRadius: 8,
+                padding: '5px 9px', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+                boxShadow: '0 2px 8px rgba(0,0,0,.15)',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#4285F4' }}>지도에서 열기</span>
+            </button>
+          )}
         </div>
 
         {/* Address info strip */}
@@ -276,6 +405,9 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
             {activePin === 'current' ? 'GPS 5분 전' : '검색 결과'}
           </span>
         </div>
+        <p style={{ margin: 0, padding: '0 12px 9px', fontSize: 9.5, color: '#bbb', background: '#fff' }}>
+          📍 지도 위 핀을 드래그하면 정확한 위치로 조정할 수 있어요
+        </p>
       </div>
 
       <div className="section-label">응급 헌혈 매칭</div>
