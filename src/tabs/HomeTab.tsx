@@ -52,14 +52,24 @@ export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onP
           aria-label="로그아웃"
           style={{
             flexShrink: 0, marginTop: 1,
-            width: 34, height: 34, borderRadius: '50%',
-            border: '1px solid var(--hair)', background: '#fff',
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--ink-45)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
           }}
         >
-          {Icons.logout('currentColor')}
+          <span style={{
+            width: 34, height: 34, borderRadius: '50%',
+            border: '1px solid var(--hair)', background: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--ink-45)',
+          }}>
+            {Icons.logout('currentColor')}
+          </span>
+          <span style={{
+            fontFamily: "'Roboto Mono', monospace", fontSize: 8.5, fontWeight: 700,
+            letterSpacing: '.06em', color: 'var(--ink-45)', whiteSpace: 'nowrap',
+          }}>
+            LOG OUT
+          </span>
         </button>
       </div>
 
