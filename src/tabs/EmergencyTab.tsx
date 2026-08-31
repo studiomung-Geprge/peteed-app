@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect, type PointerEvent as ReactPointerEvent } from 'react'
 import MissingReportModal from '../modals/MissingReportModal'
+import { SAMPLE_REPORTS, type MissingReport, type ReportStatus } from '../data/missingReports'
+
+const STATUS_STYLE: Record<ReportStatus, { bg: string; fg: string }> = {
+  '진행중': { bg: '#FFF0EB', fg: '#E8521F' },
+  '발견완료': { bg: '#E9F7EF', fg: '#1E9E5A' },
+  '매칭완료': { bg: '#EBF5FF', fg: '#2563EB' },
+}
 
 const DEFAULT_LOCATION = '경상북도 의성군 의성읍 군청길 31 의성군청'
 const makeMapSrc = (q: string) => `https://maps.google.com/maps?q=${encodeURIComponent(q)}&output=embed&hl=ko&z=16`
@@ -22,6 +29,32 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
   const [activePin, setActivePin] = useState<'current' | 'searched'>('current')
   const [showMissingModal, setShowMissingModal] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // 실종/응급 신청 리스트 — 내가 접수한 신고가 맨 앞에 추가되고, 나머지는 샘플 데이터
+  const [reports, setReports] = useState<MissingReport[]>(SAMPLE_REPORTS)
+  const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null)
+
+  const handleReported = (report: { id: string; location: string; notes: string }) => {
+    const entry: MissingReport = {
+      id: report.id,
+      kind: '실종',
+      petName,
+      info: `${petBreed} · ${petBloodType}`,
+      location: report.location,
+      status: '진행중',
+      reportedAt: '방금 전',
+      notes: report.notes || undefined,
+      mine: true,
+    }
+    setReports(prev => [entry, ...prev])
+  }
+
+  const requestCancelReport = (id: string) => setConfirmingCancelId(id)
+  const dismissCancelReport = () => setConfirmingCancelId(null)
+  const confirmCancelReport = (id: string) => {
+    setReports(prev => prev.map(r => (r.id === id ? { ...r, status: '발견완료', reportedAt: '방금 전' } : r)))
+    setConfirmingCancelId(null)
+  }
 
   // Custom draggable pin overlaid on the map, so a searched-by-name result
   // can be nudged to the exact spot rather than trusting the geocoder alone.
@@ -112,6 +145,7 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
           petBreed={petBreed}
           petBloodType={petBloodType}
           location={currentMapLocation}
+          onReported={handleReported}
           onClose={() => setShowMissingModal(false)}
         />
       )}
@@ -408,6 +442,103 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
         <p style={{ margin: 0, padding: '0 12px 9px', fontSize: 9.5, color: '#bbb', background: '#fff' }}>
           📍 지도 위 핀을 드래그하면 정확한 위치로 조정할 수 있어요
         </p>
+      </div>
+
+      {/* 실종/응급 신청 리스트 */}
+      <div className="section-label">
+        최근 실종 · 응급 신청
+        <span className="more">샘플</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
+        {reports.slice(0, 3).map(r => {
+          const st = STATUS_STYLE[r.status]
+          const confirming = confirmingCancelId === r.id
+          const mineActive = r.mine && r.status === '진행중'
+          return (
+            <div
+              key={r.id}
+              style={{
+                background: '#fff', borderRadius: 14, padding: '11px 12px',
+                border: mineActive ? '1.5px solid rgba(255,107,74,.35)' : '1px solid var(--hair)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                  background: r.kind === '실종' ? '#FFF0EB' : '#FDEEEE',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {r.kind === '실종' ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E8521F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8342A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                    </svg>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: '#1C1C1A' }}>{r.kind} · {r.petName}</span>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                      background: st.bg, color: st.fg, whiteSpace: 'nowrap',
+                    }}>{r.status}</span>
+                    {r.mine && <span style={{ fontSize: 9, fontWeight: 700, color: '#FF6B4A' }}>내 신고</span>}
+                  </div>
+                  <div style={{
+                    fontSize: 10.5, color: '#888', marginTop: 2,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {r.info} · {r.location}
+                  </div>
+                  {r.notes && (
+                    <div style={{ fontSize: 10, color: '#B8342A', marginTop: 3, lineHeight: 1.4 }}>“{r.notes}”</div>
+                  )}
+                </div>
+                <span style={{ fontSize: 9.5, color: '#bbb', flexShrink: 0, marginTop: 1 }}>{r.reportedAt}</span>
+              </div>
+
+              {mineActive && (
+                confirming ? (
+                  <div style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 10.5, color: '#7A5C52' }}>정말 찾으셨나요? 신고를 종료할게요</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={dismissCancelReport}
+                        style={{
+                          flex: 1, padding: '7px 0', borderRadius: 8, border: '1.5px solid #E0E0E0',
+                          background: '#fff', color: '#888', fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
+                          fontFamily: "'Noto Sans KR', sans-serif",
+                        }}
+                      >아니오</button>
+                      <button
+                        onClick={() => confirmCancelReport(r.id)}
+                        style={{
+                          flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
+                          background: '#1E9E5A', color: '#fff', fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
+                          fontFamily: "'Noto Sans KR', sans-serif",
+                        }}
+                      >네, 찾았어요</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => requestCancelReport(r.id)}
+                    style={{
+                      marginTop: 9, width: '100%', padding: '7px 0', borderRadius: 9,
+                      border: '1.5px solid #1E9E5A', background: '#F2FBF6', color: '#1E9E5A',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      fontFamily: "'Noto Sans KR', sans-serif",
+                    }}
+                  >찾았어요 · 신고 취소</button>
+                )
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <div className="section-label">응급 헌혈 매칭</div>

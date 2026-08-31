@@ -7,6 +7,7 @@ interface Props {
   petBloodType: string
   location: string
   onClose: () => void
+  onReported?: (report: { id: string; location: string; notes: string }) => void
 }
 
 function pad2(n: number) {
@@ -20,13 +21,17 @@ function makeReportId() {
   return `MISSING-${stamp}-${rand}`
 }
 
-export default function MissingReportModal({ petName, petPhoto, petBreed, petBloodType, location, onClose }: Props) {
+export default function MissingReportModal({ petName, petPhoto, petBreed, petBloodType, location, onClose, onReported }: Props) {
   const [phase, setPhase] = useState<'confirm' | 'submitting' | 'done'>('confirm')
   const [reportId] = useState(makeReportId)
+  const [notes, setNotes] = useState('')
 
   const submit = () => {
     setPhase('submitting')
-    setTimeout(() => setPhase('done'), 1100)
+    setTimeout(() => {
+      onReported?.({ id: reportId, location, notes: notes.trim() })
+      setPhase('done')
+    }, 1100)
   }
 
   return (
@@ -110,6 +115,24 @@ export default function MissingReportModal({ petName, petPhoto, petBreed, petBlo
               </div>
             </div>
 
+            {/* Notes */}
+            <div>
+              <label style={{ display: 'block', margin: '0 0 6px 2px', fontFamily: "'Noto Sans KR',sans-serif", fontSize: 11, fontWeight: 700, color: '#7A5C52' }}>
+                특이사항 <span style={{ fontWeight: 500, color: '#B0A199' }}>(선택)</span>
+              </label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="예: 정문 앞 화단 근처에서 마지막으로 목격, 검은색 하네스 착용, 겁이 많아 부르면 도망갈 수 있어요"
+                rows={3}
+                style={{
+                  width: '100%', border: '1.8px solid #E8D5CE', borderRadius: 12, padding: '10px 12px',
+                  fontFamily: "'Noto Sans KR',sans-serif", fontSize: 12, color: '#1C1C1A', outline: 'none',
+                  resize: 'none', boxSizing: 'border-box', lineHeight: 1.5, background: '#fff',
+                }}
+              />
+            </div>
+
             <p style={{ fontSize: 10.5, color: '#A08A82', margin: 0, lineHeight: 1.6 }}>
               신고 접수 시 이 위치를 기준으로 반경 10km 이내 보호소·동물병원과 반경 30km 이내 PETEED 사용자에게 실시간 알림이 전송돼요.
             </p>
@@ -165,6 +188,19 @@ export default function MissingReportModal({ petName, petPhoto, petBreed, petBlo
                 <span style={{ fontWeight: 600, color: '#1C1C1A', textAlign: 'right', maxWidth: 190 }}>{location}</span>
               </div>
             </div>
+
+            {notes && (
+              <div style={{
+                width: '100%', background: '#FFF7F4', borderRadius: 10, padding: '9px 11px',
+                fontSize: 10.5, color: '#7A5C52', lineHeight: 1.5, textAlign: 'left', boxSizing: 'border-box',
+              }}>
+                “{notes}”
+              </div>
+            )}
+
+            <p style={{ margin: 0, fontSize: 10.5, color: '#A08A82', lineHeight: 1.6 }}>
+              반려동물을 찾으신 경우, 신고 목록에서 언제든 신고를 종료할 수 있어요.
+            </p>
 
             <button onClick={onClose} style={{
               width: '100%', border: 'none', borderRadius: 14, padding: 14,
