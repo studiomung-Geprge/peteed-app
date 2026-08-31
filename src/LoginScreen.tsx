@@ -126,6 +126,31 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
   }
 
+  const handleGoogleLogin = async () => {
+    if (!SUPABASE_ENABLED || !supabase) {
+      // No backend configured — keep the original simulated flow.
+      onLogin()
+      return
+    }
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      })
+      if (error) {
+        // e.g. the Google provider isn't enabled in the Supabase dashboard yet.
+        console.warn('Google OAuth error:', error)
+        onLogin()
+      }
+      // On success the browser navigates away to Google, so nothing else
+      // needs to run here — App.tsx picks up the session via onAuthStateChange
+      // once the user is redirected back.
+    } catch (err) {
+      console.warn('Google OAuth exception:', err)
+      onLogin()
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <style>{`
@@ -332,7 +357,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 <NaverIcon />
                 <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: '#fff', marginRight: 22 }}>네이버로 시작하기</span>
               </button>
-              <button className="social-btn" onClick={onLogin} style={{ background: '#fff', border: '1.5px solid #F2DDD6', boxShadow: '0 4px 12px -8px rgba(0,0,0,.1)' }}>
+              <button className="social-btn" onClick={handleGoogleLogin} style={{ background: '#fff', border: '1.5px solid #F2DDD6', boxShadow: '0 4px 12px -8px rgba(0,0,0,.1)' }}>
                 <GoogleIcon />
                 <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: '#1C1C1A', marginRight: 22 }}>구글로 시작하기</span>
               </button>
