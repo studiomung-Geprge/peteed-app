@@ -34,6 +34,17 @@ const FALLBACK_FACILITIES: Facility[] = [
   { name: '포항 숲강아지', status: '운영중', chipClass: 'teal', sub: '포항시 · 유기동물 입양센터', img: FACILITY_IMAGES['포항 숲강아지'], disabled: false },
 ]
 
+// 의성 펫월드 is the flagship listing and should always lead the list —
+// the Supabase query orders rows alphabetically by name (경 < 문 < 의 < 포),
+// which would otherwise bump it out of first place.
+const PINNED_FACILITY = '의성 펫월드'
+
+function withPinnedFirst(list: Facility[]): Facility[] {
+  const pinned = list.find(f => f.name === PINNED_FACILITY)
+  if (!pinned) return list
+  return [pinned, ...list.filter(f => f.name !== PINNED_FACILITY)]
+}
+
 function WebviewModal({ facility, onClose }: { facility: Facility; onClose: () => void }) {
   const [loading, setLoading] = useState(true)
   const [blocked, setBlocked] = useState(false)
@@ -194,14 +205,14 @@ function WebviewModal({ facility, onClose }: { facility: Facility; onClose: () =
 
 export default function FacilitiesTab() {
   const [webview, setWebview] = useState<Facility | null>(null)
-  const [facilities, setFacilities] = useState<Facility[]>(FALLBACK_FACILITIES)
+  const [facilities, setFacilities] = useState<Facility[]>(withPinnedFirst(FALLBACK_FACILITIES))
 
   useEffect(() => {
     if (!SUPABASE_ENABLED) return
     fetchFacilities()
       .then(rows => {
         if (!rows.length) return
-        setFacilities(rows.map(row => ({
+        setFacilities(withPinnedFirst(rows.map(row => ({
           name: row.name,
           status: row.status === 'open' ? '운영중' : '조성중',
           chipClass: row.status === 'open' ? 'teal' : 'gold',
@@ -209,7 +220,7 @@ export default function FacilitiesTab() {
           img: FACILITY_IMAGES[row.name] ?? FALLBACK_FACILITIES[0].img,
           disabled: !row.is_bookable,
           url: row.website_url ?? undefined,
-        })))
+        }))))
       })
       .catch(err => console.warn('fetchFacilities failed, using fallback list:', err))
   }, [])
