@@ -534,4 +534,11 @@ h1.page-title {
   .device-label {
     display: none;
   }
+
+  /* 실제 기기에서는 브라우저(혹은 OS)가 자체 다이나믹 아일랜드 · 시간 ·
+     배터리 표시를 이미 보여주므로, 목업용 가짜 상단바는 숨긴다. */
+  .pl-dyn-island,
+  .pl-status-bar {
+    display: none;
+  }
 }
