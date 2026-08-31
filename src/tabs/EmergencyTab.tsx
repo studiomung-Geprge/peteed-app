@@ -1,16 +1,24 @@
 import { useState, useRef, useEffect } from 'react'
+import MissingReportModal from '../modals/MissingReportModal'
 
 const DEFAULT_LOCATION = '경상북도 의성군 의성읍 군청길 31 의성군청'
 const makeMapSrc = (q: string) => `https://maps.google.com/maps?q=${encodeURIComponent(q)}&output=embed&hl=ko&z=16`
 
-interface Props { onOpenMap: (location: string) => void }
+interface Props {
+  petName: string
+  petPhoto: string
+  petBreed: string
+  petBloodType: string
+  onOpenMap: (location: string) => void
+}
 
-export default function EmergencyTab({ onOpenMap }: Props) {
+export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType, onOpenMap }: Props) {
   const [searchInput, setSearchInput] = useState('')
   const [searchedAddress, setSearchedAddress] = useState('')
   const [mapSrc, setMapSrc] = useState(makeMapSrc(DEFAULT_LOCATION))
   const [mapLoading, setMapLoading] = useState(true)
   const [activePin, setActivePin] = useState<'current' | 'searched'>('current')
+  const [showMissingModal, setShowMissingModal] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -37,20 +45,48 @@ export default function EmergencyTab({ onOpenMap }: Props) {
 
   return (
     <>
+      {showMissingModal && (
+        <MissingReportModal
+          petName={petName}
+          petPhoto={petPhoto}
+          petBreed={petBreed}
+          petBloodType={petBloodType}
+          location={currentMapLocation}
+          onClose={() => setShowMissingModal(false)}
+        />
+      )}
+
       <p className="eyebrow">EMERGENCY</p>
       <h1 className="page-title">응급 · 실종</h1>
       <p className="sub">위치기반 실종 신고와 응급 헌혈 매칭을 지원해요</p>
 
-      <button className="sos-btn">
-        <div className="ic">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {/* Registered pet mini-card */}
+        <div style={{
+          flexShrink: 0, width: 78,
+          borderRadius: 18, padding: '10px 6px',
+          background: '#fff', border: '1.5px solid var(--hair)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+        }}>
+          <img src={petPhoto} alt={petName} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+          <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{petName}</span>
+          <span style={{
+            fontSize: 8.5, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
+            background: '#FDEEEE', color: '#B8342A', whiteSpace: 'nowrap',
+          }}>{petBloodType}</span>
         </div>
-        <div><b>실종 신고하기</b><span>QR 태그 · GPS 반경 10km/30km 알림</span></div>
-      </button>
+
+        <button className="sos-btn" style={{ flex: 1, margin: 0 }} onClick={() => setShowMissingModal(true)}>
+          <div className="ic">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div><b>실종 신고하기</b><span>QR 태그 · GPS 반경 10km/30km 알림</span></div>
+        </button>
+      </div>
 
       {/* Map section */}
       <div style={{ margin: '12px 0 0', borderRadius: 18, overflow: 'hidden', border: '1.5px solid rgba(0,0,0,.07)', background: '#F8F4F1' }}>

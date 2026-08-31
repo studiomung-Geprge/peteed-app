@@ -267,7 +267,13 @@ export default function App() {
             </div>
 
             <div className={`pl-page${activeTab === 'emergency' ? ' active' : ''}`}>
-              <EmergencyTab onOpenMap={loc => setMapPopup(loc)} />
+              <EmergencyTab
+                petName={petName}
+                petPhoto={petPhoto}
+                petBreed={petBreed}
+                petBloodType={petBloodType}
+                onOpenMap={loc => setMapPopup(loc)}
+              />
             </div>
           </div>
 
