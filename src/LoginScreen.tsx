@@ -349,6 +349,10 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
             {/* Social buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, animation: 'fadeUp .7s ease' }}>
+              <button className="social-btn" onClick={handleGoogleLogin} style={{ background: '#fff', border: '1.5px solid #F2DDD6', boxShadow: '0 4px 12px -8px rgba(0,0,0,.1)' }}>
+                <GoogleIcon />
+                <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: '#1C1C1A', marginRight: 22 }}>구글로 시작하기</span>
+              </button>
               <button className="social-btn" onClick={onLogin} style={{ background: '#FEE500', boxShadow: '0 4px 12px -6px rgba(254,229,0,.55)' }}>
                 <KakaoIcon />
                 <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: 'rgba(0,0,0,.85)', marginRight: 22 }}>카카오로 시작하기</span>
@@ -356,10 +360,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               <button className="social-btn" onClick={onLogin} style={{ background: '#03C75A', boxShadow: '0 4px 12px -6px rgba(3,199,90,.4)' }}>
                 <NaverIcon />
                 <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: '#fff', marginRight: 22 }}>네이버로 시작하기</span>
-              </button>
-              <button className="social-btn" onClick={handleGoogleLogin} style={{ background: '#fff', border: '1.5px solid #F2DDD6', boxShadow: '0 4px 12px -8px rgba(0,0,0,.1)' }}>
-                <GoogleIcon />
-                <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: '#1C1C1A', marginRight: 22 }}>구글로 시작하기</span>
               </button>
             </div>
 
