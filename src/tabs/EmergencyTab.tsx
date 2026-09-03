@@ -71,16 +71,25 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
   const handleSearch = () => {
     const q = searchInput.trim()
     if (!q) return
-    setMapSrc(makeMapSrc(q))
+    const nextSrc = makeMapSrc(q)
+    // Only show the loading spinner when the iframe's src is actually
+    // changing — the iframe never re-fires onLoad for an unchanged src, so
+    // setting mapLoading(true) unconditionally left the spinner stuck
+    // forever whenever the same address was searched again.
+    if (nextSrc !== mapSrc) setMapLoading(true)
+    setMapSrc(nextSrc)
     setSearchedAddress(q)
     setActivePin('searched')
-    setMapLoading(true)
   }
 
   const handleCurrentLocation = () => {
-    setMapSrc(makeMapSrc(DEFAULT_LOCATION))
+    const nextSrc = makeMapSrc(DEFAULT_LOCATION)
+    // Same fix as handleSearch: clicking "현재 위치" while it's already the
+    // active pin left the map stuck on the loading spinner forever, since
+    // the iframe src doesn't change and onLoad never re-fires.
+    if (nextSrc !== mapSrc) setMapLoading(true)
+    setMapSrc(nextSrc)
     setActivePin('current')
-    setMapLoading(true)
   }
 
   // 현재 위치 / 검색된 위치 중 선택된 쪽의 주소가 그대로 응급·실종 신고의 위치로 등록돼요.
