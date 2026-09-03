@@ -21,7 +21,7 @@ async function step(name, fn) {
   await page.waitForTimeout(600);
   await step('shot login', () => page.screenshot({ path: '/home/claude/peteed-app/shot_1_login.png' }));
 
-  await step('login click', () => page.click('text=카카오로 시작하기'));
+  await step('login click', () => page.click('text=네이버로 시작하기'));
   await page.waitForTimeout(400);
   await step('shot home', () => page.screenshot({ path: '/home/claude/peteed-app/shot_2_home.png' }));
 

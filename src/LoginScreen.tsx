@@ -151,6 +151,31 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
   }
 
+  const handleKakaoLogin = async () => {
+    if (!SUPABASE_ENABLED || !supabase) {
+      // No backend configured — keep the original simulated flow.
+      onLogin()
+      return
+    }
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: { redirectTo: window.location.origin },
+      })
+      if (error) {
+        // e.g. the Kakao provider isn't enabled in the Supabase dashboard yet.
+        console.warn('Kakao OAuth error:', error)
+        onLogin()
+      }
+      // On success the browser navigates away to Kakao, so nothing else
+      // needs to run here — App.tsx picks up the session via onAuthStateChange
+      // once the user is redirected back.
+    } catch (err) {
+      console.warn('Kakao OAuth exception:', err)
+      onLogin()
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <style>{`
@@ -353,7 +378,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 <GoogleIcon />
                 <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: '#1C1C1A', marginRight: 22 }}>구글로 시작하기</span>
               </button>
-              <button className="social-btn" onClick={onLogin} style={{ background: '#FEE500', boxShadow: '0 4px 12px -6px rgba(254,229,0,.55)' }}>
+              <button className="social-btn" onClick={handleKakaoLogin} style={{ background: '#FEE500', boxShadow: '0 4px 12px -6px rgba(254,229,0,.55)' }}>
                 <KakaoIcon />
                 <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: 'rgba(0,0,0,.85)', marginRight: 22 }}>카카오로 시작하기</span>
               </button>
