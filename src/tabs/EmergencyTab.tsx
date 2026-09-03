@@ -9,8 +9,33 @@ const STATUS_STYLE: Record<ReportStatus, { bg: string; fg: string }> = {
   '매칭완료': { bg: '#EBF5FF', fg: '#2563EB' },
 }
 
-const DEFAULT_LOCATION = '경상북도 의성군 의성읍 군청길 31 의성군청'
+// GPS 권한을 아직 못 받았거나 실패했을 때만 보여주는 임시 위치 — 실제 로그인 후에는
+// 곧바로 브라우저의 진짜 현재 위치로 대체돼요.
+const FALLBACK_LOCATION = '경상북도 의성군 의성읍 군청길 31 의성군청'
 const makeMapSrc = (q: string) => `https://maps.google.com/maps?q=${encodeURIComponent(q)}&output=embed&hl=ko&z=16`
+
+const REVERSE_GEOCODE_TIMEOUT_MS = 6000
+
+// 좌표 → 사람이 읽을 수 있는 주소로 변환 (무료·키 없이 쓸 수 있는 OpenStreetMap
+// Nominatim API). 실패하거나 시간 초과되면 null을 반환해 호출부에서 좌표 자체를
+// 라벨로 대신 쓰도록 한다.
+async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REVERSE_GEOCODE_TIMEOUT_MS)
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ko&zoom=18`,
+      { signal: controller.signal, headers: { Accept: 'application/json' } }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    return typeof data?.display_name === 'string' ? data.display_name : null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
 
 interface Props {
   petName: string
@@ -23,9 +48,16 @@ interface Props {
 export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType, onOpenMap }: Props) {
   const [searchInput, setSearchInput] = useState('')
   const [searchedAddress, setSearchedAddress] = useState('')
-  const [mapSrc, setMapSrc] = useState(makeMapSrc(DEFAULT_LOCATION))
+  const [mapSrc, setMapSrc] = useState(makeMapSrc(FALLBACK_LOCATION))
   const [mapLoading, setMapLoading] = useState(true)
   const [activePin, setActivePin] = useState<'current' | 'searched'>('current')
+
+  // 실제 GPS 현재 위치 — 권한 요청 전/실패 시에는 FALLBACK_LOCATION을 그대로 보여주고,
+  // 위치 확인에 성공하면 좌표 기반 주소로 교체된다.
+  const [currentLocation, setCurrentLocation] = useState(FALLBACK_LOCATION)
+  const [locatingGps, setLocatingGps] = useState(false)
+  const [gpsFixed, setGpsFixed] = useState(false)
+  const [gpsError, setGpsError] = useState<string | null>(null)
   const [showMissingModal, setShowMissingModal] = useState(false)
   const [showActionMenu, setShowActionMenu] = useState(false)
   const [bloodHighlight, setBloodHighlight] = useState(false)
@@ -63,9 +95,77 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
 
   const selectedReport = reports.find(r => r.id === selectedReportId) ?? null
 
+  // 브라우저의 실제 현재 위치를 가져와 지도와 주소 라벨을 갱신한다.
+  // "현재 위치" 버튼을 누를 때마다, 그리고 탭이 처음 열릴 때 한 번 자동으로 호출된다.
+  const locateCurrentPosition = () => {
+    setActivePin('current')
+    setGpsError(null)
+
+    if (!('geolocation' in navigator)) {
+      setGpsError('이 브라우저는 위치 확인을 지원하지 않아요')
+      return
+    }
+
+    setLocatingGps(true)
+
+    // 브라우저에 따라 위치 권한 팝업에 아무 응답도 하지 않으면 getCurrentPosition의
+    // 자체 timeout 옵션마저 발동하지 않고 콜백이 영영 안 불리는 경우가 있다. 그래서
+    // 이 앱 차원에서 별도의 안전장치 타이머를 둬서, 어떤 경우든 13초 안에는 로딩
+    // 상태가 반드시 풀리도록 보장한다.
+    let settled = false
+    const giveUpTimer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      setLocatingGps(false)
+      setGpsError('위치 확인이 시간 초과됐어요. 다시 시도해주세요')
+    }, 13000)
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        if (settled) return
+        settled = true
+        clearTimeout(giveUpTimer)
+
+        const { latitude, longitude } = pos.coords
+        const coordQuery = `${latitude},${longitude}`
+        const address = await reverseGeocode(latitude, longitude)
+        const label = address ?? `위도 ${latitude.toFixed(5)}, 경도 ${longitude.toFixed(5)}`
+
+        setCurrentLocation(label)
+        setGpsFixed(true)
+        setLocatingGps(false)
+
+        const nextSrc = makeMapSrc(coordQuery)
+        // Only show the loading spinner when the iframe's src is actually
+        // changing — the iframe never re-fires onLoad for an unchanged src, so
+        // setting mapLoading(true) unconditionally left the spinner stuck
+        // forever whenever the map was refreshed to the same place.
+        setMapSrc(prev => {
+          if (nextSrc !== prev) setMapLoading(true)
+          return nextSrc
+        })
+      },
+      (err) => {
+        if (settled) return
+        settled = true
+        clearTimeout(giveUpTimer)
+
+        setLocatingGps(false)
+        if (err.code === err.PERMISSION_DENIED) {
+          setGpsError('위치 접근이 거부됐어요. 브라우저 설정에서 위치 권한을 허용해주세요')
+        } else if (err.code === err.TIMEOUT) {
+          setGpsError('위치 확인이 시간 초과됐어요. 다시 시도해주세요')
+        } else {
+          setGpsError('현재 위치를 확인할 수 없어요')
+        }
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+    )
+  }
+
   useEffect(() => {
-    setMapSrc(makeMapSrc(DEFAULT_LOCATION))
-    setMapLoading(true)
+    locateCurrentPosition()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleSearch = () => {
@@ -83,17 +183,11 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
   }
 
   const handleCurrentLocation = () => {
-    const nextSrc = makeMapSrc(DEFAULT_LOCATION)
-    // Same fix as handleSearch: clicking "현재 위치" while it's already the
-    // active pin left the map stuck on the loading spinner forever, since
-    // the iframe src doesn't change and onLoad never re-fires.
-    if (nextSrc !== mapSrc) setMapLoading(true)
-    setMapSrc(nextSrc)
-    setActivePin('current')
+    locateCurrentPosition()
   }
 
   // 현재 위치 / 검색된 위치 중 선택된 쪽의 주소가 그대로 응급·실종 신고의 위치로 등록돼요.
-  const currentMapLocation = activePin === 'searched' && searchedAddress ? searchedAddress : DEFAULT_LOCATION
+  const currentMapLocation = activePin === 'searched' && searchedAddress ? searchedAddress : currentLocation
 
   const openMissingReport = () => {
     setShowActionMenu(false)
@@ -241,7 +335,9 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
                 placeholder="주소 또는 장소 검색..."
                 style={{
                   flex: 1, border: 'none', background: 'transparent', outline: 'none',
-                  fontSize: 12, color: '#1C1C1A', padding: '9px 0',
+                  // iOS Safari는 포커스된 입력창의 글자 크기가 16px 미만이면 화면을
+                  // 자동으로 확대해버린다 — 16px 이상으로 유지해서 그 동작을 막는다.
+                  fontSize: 16, color: '#1C1C1A', padding: '9px 0',
                   fontFamily: "'Noto Sans KR', sans-serif",
                 }}
               />
@@ -276,12 +372,21 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
                 borderRadius: 8, padding: '4px 9px', cursor: 'pointer',
               }}
             >
-              <div style={{
-                width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                background: '#3B82F6',
-                boxShadow: activePin === 'current' ? '0 0 0 3px rgba(59,130,246,.25)' : 'none',
-              }} />
-              <span style={{ fontSize: 10.5, fontWeight: 600, color: activePin === 'current' ? '#2563EB' : '#888' }}>현재 위치</span>
+              {locatingGps ? (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ animation: 'mapSpin 1s linear infinite', flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="9" stroke="#BFD6F7" strokeWidth="3"/>
+                  <path d="M21 12A9 9 0 0 0 12 3" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round"/>
+                </svg>
+              ) : (
+                <div style={{
+                  width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                  background: '#3B82F6',
+                  boxShadow: activePin === 'current' ? '0 0 0 3px rgba(59,130,246,.25)' : 'none',
+                }} />
+              )}
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: activePin === 'current' ? '#2563EB' : '#888' }}>
+                {locatingGps ? '위치 확인 중...' : '현재 위치'}
+              </span>
             </button>
 
             <button
@@ -309,6 +414,12 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
               </span>
             )}
           </div>
+
+          {gpsError && (
+            <p style={{ margin: '6px 2px 0', fontSize: 10, color: '#E8521F', fontWeight: 600 }}>
+              ⚠ {gpsError}
+            </p>
+          )}
         </div>
 
         {/* Google Maps iframe */}
@@ -355,7 +466,7 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
               {activePin === 'current' ? (
                 <>
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'white', flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, color: 'white', fontWeight: 600 }}>현재 위치 · 의성군청</span>
+                  <span style={{ fontSize: 10, color: 'white', fontWeight: 600 }}>{gpsFixed ? '현재 위치 · GPS' : '현재 위치'}</span>
                 </>
               ) : (
                 <>
@@ -405,11 +516,11 @@ export default function EmergencyTab({ petName, petPhoto, petBreed, petBloodType
               boxShadow: activePin === 'current' ? '0 0 0 2px rgba(59,130,246,.3)' : '0 0 0 2px rgba(255,107,74,.3)',
             }} />
             <span style={{ fontSize: 11, color: '#555', fontWeight: 500 }}>
-              {activePin === 'current' ? `현재 위치 · ${DEFAULT_LOCATION}` : `검색 위치 · ${searchedAddress}`}
+              {activePin === 'current' ? `현재 위치 · ${currentLocation}` : `검색 위치 · ${searchedAddress}`}
             </span>
           </div>
           <span style={{ fontSize: 10, color: '#bbb' }}>
-            {activePin === 'current' ? 'GPS 5분 전' : '검색 결과'}
+            {activePin === 'current' ? (locatingGps ? '확인 중...' : gpsFixed ? 'GPS 방금 확인됨' : 'GPS 미확인') : '검색 결과'}
           </span>
         </div>
       </div>
