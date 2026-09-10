@@ -35,7 +35,9 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
         .ob-input {
           width:100%; padding:13px 14px; border:1.8px solid #E8D5CE;
           border-radius:13px; font-family:'Noto Sans KR',sans-serif;
-          font-size:13.5px; color:#1C1C1A; background:#fff;
+          /* 16px avoids iOS Safari's auto-zoom-on-focus behavior, which
+             kicks in for any focused input/textarea below that size. */
+          font-size:16px; color:#1C1C1A; background:#fff;
           outline:none; box-sizing:border-box; transition:border-color .2s, box-shadow .2s;
         }
         .ob-input:focus { border-color:#FF6B4A; box-shadow:0 0 0 3px rgba(255,107,74,.15); }
