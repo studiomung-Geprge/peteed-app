@@ -17,7 +17,7 @@ export function naverLoginConfigured(): boolean {
   )
 }
 
-function buildNaverAuthorizeUrl(state: string): string | null {
+function buildNaverAuthorizeUrl(state: string, opts?: { forceReauth?: boolean }): string | null {
   const clientId = import.meta.env.VITE_NAVER_CLIENT_ID as string | undefined
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
   if (!clientId || !supabaseUrl) return null
@@ -28,6 +28,15 @@ function buildNaverAuthorizeUrl(state: string): string | null {
   authorizeUrl.searchParams.set('client_id', clientId)
   authorizeUrl.searchParams.set('redirect_uri', redirectUri)
   authorizeUrl.searchParams.set('state', state)
+  if (opts?.forceReauth) {
+    // Without this, Naver silently re-approves using the browser's existing
+    // Naver login session/consent and skips straight back to redirect_uri —
+    // no login screen at all. My Page's 계정 연동 promises that switching a
+    // provider off and back on re-verifies the account from scratch (see
+    // ConfirmDisconnectModal's copy), so linking always forces Naver's own
+    // login screen regardless of any existing session.
+    authorizeUrl.searchParams.set('auth_type', 'reauthenticate')
+  }
   return authorizeUrl.toString()
 }
 
@@ -45,7 +54,7 @@ export function startNaverLogin(): boolean {
 /** Redirects the browser to Naver to link it to the already-signed-in user,
  * using a server-issued ticket id (from naver-link-start) as `state`. */
 export function startNaverLink(ticket: string): boolean {
-  const url = buildNaverAuthorizeUrl(ticket)
+  const url = buildNaverAuthorizeUrl(ticket, { forceReauth: true })
   if (!url) return false
   window.location.href = url
   return true
