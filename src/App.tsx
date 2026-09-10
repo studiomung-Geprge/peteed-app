@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
-import { getMyPet, createMyPet, updateGuardianName, updatePetName, getGuardianName } from './lib/petData'
+import { getMyPet, createMyPet, updateGuardianName, updatePetName, getPersonalInfo, updatePersonalInfo } from './lib/petData'
 import { HEALTH_RECORDS, type HealthRecord } from './data/healthRecords'
 import LoginScreen from './LoginScreen'
 import OnboardingScreen from './OnboardingScreen'
@@ -19,6 +19,7 @@ import HealthRecordModal from './modals/HealthRecordModal'
 import GovIdModal from './modals/GovIdModal'
 import MapPopupModal from './modals/MapPopupModal'
 import EditProfileModal from './modals/EditProfileModal'
+import EditPersonalInfoModal from './modals/EditPersonalInfoModal'
 
 type TabId = 'home' | 'wallet' | 'health' | 'facilities' | 'emergency'
 
@@ -59,7 +60,10 @@ export default function App() {
   // this is edited locally only (like petBreed) rather than persisted.
   const [petBloodType, setPetBloodType] = useState('DEA 1.1 양성')
   const [guardianName, setGuardianName] = useState('죠지')
+  const [guardianPhone, setGuardianPhone] = useState('')
+  const [guardianAddress, setGuardianAddress] = useState('')
   const [showEditProfile, setShowEditProfile] = useState(false)
+  const [showEditPersonalInfo, setShowEditPersonalInfo] = useState(false)
   const [showMyPage, setShowMyPage] = useState(false)
   // null = not checked yet, true = real Supabase user with no pet on file
   // (needs the one-time onboarding form), false = ready to show the app.
@@ -158,9 +162,11 @@ export default function App() {
   // form instead of a hardcoded "만두" placeholder.
   useEffect(() => {
     if (!session?.user) { setNeedsOnboarding(false); return }
-    Promise.all([getMyPet(session.user.id), getGuardianName(session.user.id)])
-      .then(([pet, fullName]) => {
-        if (fullName) setGuardianName(fullName)
+    Promise.all([getMyPet(session.user.id), getPersonalInfo(session.user.id)])
+      .then(([pet, info]) => {
+        if (info.fullName) setGuardianName(info.fullName)
+        setGuardianPhone(info.phone ?? '')
+        setGuardianAddress(info.address ?? '')
         if (pet) {
           setPetName(pet.name)
           setPetId(pet.id)
@@ -208,6 +214,20 @@ export default function App() {
     setPetName(newPetName)
     setPetBloodType(newBloodType)
     setShowEditProfile(false)
+  }
+
+  const handleEditPersonalInfoSave = async (newGuardianName: string, newPhone: string, newAddress: string) => {
+    if (session?.user) {
+      try {
+        await updatePersonalInfo(session.user.id, { fullName: newGuardianName, phone: newPhone, address: newAddress })
+      } catch (err) {
+        console.warn('personal info save failed:', err)
+      }
+    }
+    setGuardianName(newGuardianName)
+    setGuardianPhone(newPhone)
+    setGuardianAddress(newAddress)
+    setShowEditPersonalInfo(false)
   }
 
   if (!loggedIn) return <LoginScreen onLogin={() => setDemoLoggedIn(true)} />
@@ -289,6 +309,15 @@ export default function App() {
               onSave={handleEditProfileSave}
             />
           )}
+          {showEditPersonalInfo && (
+            <EditPersonalInfoModal
+              guardianName={guardianName}
+              phone={guardianPhone}
+              address={guardianAddress}
+              onClose={() => setShowEditPersonalInfo(false)}
+              onSave={handleEditPersonalInfoSave}
+            />
+          )}
           {showMyPage && (
             <MyPageScreen
               session={session}
@@ -298,6 +327,7 @@ export default function App() {
               petPhoto={petPhoto}
               onBack={() => setShowMyPage(false)}
               onEditProfile={() => setShowEditProfile(true)}
+              onEditPersonalInfo={() => setShowEditPersonalInfo(true)}
               onLogout={handleLogout}
             />
           )}

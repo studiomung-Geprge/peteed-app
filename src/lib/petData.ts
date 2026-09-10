@@ -78,6 +78,44 @@ export async function updatePetName(petId: string, name: string): Promise<void> 
   if (error) throw error
 }
 
+export interface PersonalInfo {
+  fullName: string | null
+  phone: string | null
+  address: string | null
+}
+
+// My Page's "개인 회원 정보 수정" panel — same `profiles` row as
+// getGuardianName/updateGuardianName, plus the optional phone/address
+// columns added for that panel (see the add_profile_phone_and_address
+// migration).
+export async function getPersonalInfo(userId: string): Promise<PersonalInfo> {
+  if (!supabase) return { fullName: null, phone: null, address: null }
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('full_name, phone, address')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return {
+    fullName: data?.full_name ?? null,
+    phone: data?.phone ?? null,
+    address: data?.address ?? null,
+  }
+}
+
+export async function updatePersonalInfo(userId: string, info: { fullName: string; phone: string; address: string }): Promise<void> {
+  if (!supabase) return
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      full_name: info.fullName,
+      phone: info.phone || null,
+      address: info.address || null,
+    })
+    .eq('id', userId)
+  if (error) throw error
+}
+
 export interface FacilityRow {
   id: string
   name: string

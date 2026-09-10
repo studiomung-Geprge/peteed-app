@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
 import { startNaverLink, naverLoginConfigured } from './lib/naverAuth'
 import { Icons } from './icons'
+import { GoogleIcon, KakaoIcon, NaverIcon } from './components/ProviderIcons'
 
 type ProviderKey = 'google' | 'kakao' | 'naver'
 
-const PROVIDER_META: Record<ProviderKey, { label: string; color: string; bg: string }> = {
-  google: { label: '구글', color: '#EA4335', bg: '#FDEEED' },
-  kakao: { label: '카카오', color: 'rgba(0,0,0,.72)', bg: '#FFF6D2' },
-  naver: { label: '네이버', color: '#03C75A', bg: '#E7F9EF' },
+const PROVIDER_META: Record<ProviderKey, { label: string; color: string; chipBg: string; rowBg: string; rowBorder?: string; icon: () => ReactElement }> = {
+  google: { label: '구글', color: '#EA4335', chipBg: '#FDEEED', rowBg: '#fff', rowBorder: '1.5px solid #E5E7EB', icon: GoogleIcon },
+  kakao: { label: '카카오', color: 'rgba(0,0,0,.72)', chipBg: '#FFF6D2', rowBg: '#FEE500', icon: KakaoIcon },
+  naver: { label: '네이버', color: '#03C75A', chipBg: '#E7F9EF', rowBg: '#03C75A', icon: NaverIcon },
 }
 
 interface Props {
@@ -20,11 +21,12 @@ interface Props {
   petPhoto: string
   onBack: () => void
   onEditProfile: () => void
+  onEditPersonalInfo: () => void
   onLogout: () => void
 }
 
 export default function MyPageScreen({
-  session, demoLoggedIn, guardianName, petName, petPhoto, onBack, onEditProfile, onLogout,
+  session, demoLoggedIn, guardianName, petName, petPhoto, onBack, onEditProfile, onEditPersonalInfo, onLogout,
 }: Props) {
   const user = session?.user
   // "Native" here means a real Supabase auth.identities row — Google/Kakao
@@ -34,6 +36,9 @@ export default function MyPageScreen({
   const [naverConnected, setNaverConnected] = useState<boolean>(Boolean(user?.user_metadata?.naver_id))
   const [busy, setBusy] = useState<ProviderKey | null>(null)
   const [message, setMessage] = useState<{ type: 'error' | 'info'; text: string } | null>(null)
+  const [highlighted, setHighlighted] = useState<ProviderKey | null>(null)
+  const providerRowRefs = useRef<Record<ProviderKey, HTMLDivElement | null>>({ google: null, kakao: null, naver: null })
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refreshIdentities = useCallback(async () => {
     if (!supabase || !session) return
@@ -46,11 +51,24 @@ export default function MyPageScreen({
     setNaverConnected(Boolean(user?.user_metadata?.naver_id))
   }, [user?.user_metadata?.naver_id])
 
+  useEffect(() => () => {
+    if (highlightTimer.current) clearTimeout(highlightTimer.current)
+  }, [])
+
   const isConnected = (p: ProviderKey) =>
     p === 'naver' ? naverConnected : nativeProviders.includes(p)
 
   const connectedCount = (['google', 'kakao', 'naver'] as ProviderKey[]).filter(isConnected).length
   const currentProvider = (user?.app_metadata?.provider as string | undefined) ?? null
+
+  const jumpToProvider = (p: ProviderKey) => {
+    const el = providerRowRefs.current[p]
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlighted(p)
+    if (highlightTimer.current) clearTimeout(highlightTimer.current)
+    highlightTimer.current = setTimeout(() => setHighlighted(null), 1600)
+  }
 
   const handleConnect = async (p: ProviderKey) => {
     if (!supabase || !session) return
@@ -133,6 +151,7 @@ export default function MyPageScreen({
 
   const identifier = user?.email ?? (demoLoggedIn ? '데모 로그인' : '')
   const showsSyntheticEmail = Boolean(user?.email?.endsWith('@users.peteed.app'))
+  const canJumpToProvider = SUPABASE_ENABLED && Boolean(session) && currentProvider && (currentProvider in PROVIDER_META)
 
   return (
     <div style={{
@@ -144,6 +163,11 @@ export default function MyPageScreen({
       <style>{`
         @keyframes mp-in { from { opacity:0; transform: translateX(16px) } to { opacity:1; transform: translateX(0) } }
         @keyframes mp-spin { to { transform: rotate(360deg) } }
+        @keyframes mp-highlight {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,74,0); }
+          20%, 60% { box-shadow: 0 0 0 3px rgba(255,107,74,.45); }
+        }
+        .mp-row-highlight { animation: mp-highlight 1.6s ease; border-radius: 16px; }
       `}</style>
 
       <div style={{ flexShrink: 0, height: 54 }} />
@@ -164,8 +188,12 @@ export default function MyPageScreen({
       </div>
 
       <div className="pl-content" style={{ padding: '0 22px 24px' }}>
-        {/* ── Current account ── */}
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* ── Current account → opens personal info edit ── */}
+        <div
+          className="card"
+          style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+          onClick={onEditPersonalInfo}
+        >
           <div style={{
             width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
             background: 'var(--paper-2)', color: 'var(--gold)',
@@ -180,13 +208,40 @@ export default function MyPageScreen({
             </p>
           </div>
           {currentProvider && (
-            <span className="chip" style={{
-              background: PROVIDER_META[currentProvider as ProviderKey]?.bg ?? 'var(--paper-2)',
-              color: PROVIDER_META[currentProvider as ProviderKey]?.color ?? 'var(--ink-70)',
-            }}>
+            <span
+              className="chip"
+              onClick={e => {
+                if (!canJumpToProvider) return
+                e.stopPropagation()
+                jumpToProvider(currentProvider as ProviderKey)
+              }}
+              style={{
+                background: PROVIDER_META[currentProvider as ProviderKey]?.chipBg ?? 'var(--paper-2)',
+                color: PROVIDER_META[currentProvider as ProviderKey]?.color ?? 'var(--ink-70)',
+                cursor: canJumpToProvider ? 'pointer' : 'default',
+              }}
+            >
               {PROVIDER_META[currentProvider as ProviderKey]?.label ?? currentProvider} 로그인 중
             </span>
           )}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+
+        {/* ── Pet info ── */}
+        <div className="section-label">반려동물 정보</div>
+        <div className="card" style={{ cursor: 'pointer' }} onClick={onEditProfile}>
+          <div className="row">
+            <img src={petPhoto} alt={petName} style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p className="row-title">{petName}</p>
+              <p className="row-sub">보호자 · 반려동물 이름과 혈액형 수정</p>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
         </div>
 
         {/* ── Identity linking ── */}
@@ -208,11 +263,20 @@ export default function MyPageScreen({
               const connected = isConnected(p)
               const meta = PROVIDER_META[p]
               const isBusy = busy === p
+              const Icon = meta.icon
               return (
-                <div key={p} className="card">
+                <div
+                  key={p}
+                  ref={el => { providerRowRefs.current[p] = el }}
+                  className={`card${highlighted === p ? ' mp-row-highlight' : ''}`}
+                >
                   <div className="row">
-                    <div className="row-icon" style={{ background: meta.bg, color: meta.color, fontWeight: 800, fontSize: 13 }}>
-                      {meta.label[0]}
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                      background: meta.rowBg, border: meta.rowBorder,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Icon />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p className="row-title">{meta.label}</p>
@@ -251,21 +315,6 @@ export default function MyPageScreen({
             )}
           </>
         )}
-
-        {/* ── Pet info ── */}
-        <div className="section-label">반려동물 정보</div>
-        <div className="card" style={{ cursor: 'pointer' }} onClick={onEditProfile}>
-          <div className="row">
-            <img src={petPhoto} alt={petName} style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p className="row-title">{petName}</p>
-              <p className="row-sub">보호자 · 반려동물 이름과 혈액형 수정</p>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </div>
-        </div>
 
         {/* ── Logout ── */}
         <button
