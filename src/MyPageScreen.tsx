@@ -74,6 +74,28 @@ export default function MyPageScreen({
     }
   }, [])
 
+  // handleConnect sets `busy` right before sending the browser to the
+  // provider's consent screen via a full-page redirect — normally the
+  // *next* thing that happens is a fresh page load on the way back, which
+  // remounts this component with `busy` reset to null. But if the user
+  // backs out instead of finishing (closes the tab, presses back) without
+  // ever completing the round trip, some browsers restore this exact page
+  // from the back/forward cache rather than reloading it — none of our
+  // mount effects re-run in that case, so the spinner we set would
+  // otherwise never clear. `pageshow` with `persisted: true` is the
+  // browser's own signal for "resumed from bfcache, not a fresh load" —
+  // treat it as an abandoned attempt and fall back to the disconnected
+  // state instead of spinning forever.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return
+      setBusy(null)
+      sessionStorage.removeItem('mypage_return_pending')
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
   const isConnected = (p: ProviderKey) =>
     p === 'naver' ? naverConnected : nativeProviders.includes(p)
 
@@ -105,9 +127,19 @@ export default function MyPageScreen({
         startNaverLink(data.ticket)
         return
       }
+      // Without an explicit `prompt`, Google/Kakao silently reuse whatever
+      // account the browser already has an active session + prior consent
+      // for — the picker never appears, so a returning tester (or someone
+      // sharing a browser) can end up linking the wrong account without
+      // ever seeing which one it was. Force the picker every time, the
+      // same fix already applied to Naver linking (auth_type=reauthenticate
+      // in naverAuth.ts) — each provider's own name for "show me the
+      // chooser/login screen regardless of any existing session":
+      //   Google: prompt=select_account · Kakao: prompt=login
+      const queryParams = p === 'google' ? { prompt: 'select_account' } : { prompt: 'login' }
       const { error } = await supabase.auth.linkIdentity({
         provider: p,
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo: window.location.origin, queryParams },
       })
       if (error) throw error
       // Browser leaves for the provider's consent screen — nothing else runs.
