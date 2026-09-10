@@ -115,7 +115,14 @@ export default function App() {
     }
 
     if (naverLinked || naverLinkError) {
-      if (naverLinkError) console.warn('네이버 계정 연결 실패:', naverLinkError)
+      if (naverLinkError) {
+        console.warn('네이버 계정 연결 실패:', naverLinkError)
+        // MyPageScreen re-mounts on this same return trip (see the
+        // mypage_return_pending flag below) — it can't read this URL param
+        // itself, so hand the message off via sessionStorage for it to pick
+        // up and show instead of failing silently.
+        sessionStorage.setItem('mypage_link_error', naverLinkError)
+      }
       if (naverLinked) {
         // The Edge Function updated this user's metadata via the Admin API
         // after our session's JWT was issued, so the cached claims are

@@ -153,7 +153,14 @@ Deno.serve(async (req: Request) => {
       const { error: linkUpdateErr } = await admin.auth.admin.updateUserById(targetUser.id, {
         app_metadata: {
           ...targetUser.app_metadata,
-          provider: "naver",
+          // NOTE: deliberately NOT touching `provider` (singular) here. That
+          // field reflects how the user is *currently signed in* (it drives
+          // the "로그인 중" badge in My Page) — linking a Naver account while
+          // already signed in via Google/Kakao/email doesn't change how this
+          // session authenticated, so overwriting it made My Page look like
+          // the user had been switched/logged out of their real provider
+          // even though their session never changed. Only grow the list of
+          // linked methods.
           providers: Array.from(new Set([...existingProviders, "naver"])),
         },
         user_metadata: {

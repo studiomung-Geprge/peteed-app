@@ -57,6 +57,18 @@ export default function MyPageScreen({
     setNaverConnected(Boolean(user?.user_metadata?.naver_id))
   }, [user?.user_metadata?.naver_id])
 
+  // App.tsx hands off a link failure (e.g. "already connected to a
+  // different account") this way, since it happens on the same page load
+  // that reopens My Page after the Naver round trip — there's no other
+  // channel to get the message into this screen.
+  useEffect(() => {
+    const pending = sessionStorage.getItem('mypage_link_error')
+    if (pending) {
+      sessionStorage.removeItem('mypage_link_error')
+      setMessage({ type: 'error', text: pending })
+    }
+  }, [])
+
   const isConnected = (p: ProviderKey) =>
     p === 'naver' ? naverConnected : nativeProviders.includes(p)
 
