@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
 import { startNaverLink, naverLoginConfigured } from './lib/naverAuth'
+import { uploadAvatar } from './lib/petData'
 import { Icons } from './icons'
 import { GoogleIcon, KakaoIcon, NaverIcon } from './components/ProviderIcons'
+import { DEFAULT_AVATAR } from './assets/defaultAvatar'
+
+const MAX_AVATAR_BYTES = 8 * 1024 * 1024
 
 type ProviderKey = 'google' | 'kakao' | 'naver'
 
@@ -19,6 +23,8 @@ interface Props {
   guardianName: string
   petName: string
   petPhoto: string
+  avatarUrl: string
+  onAvatarChange: (url: string) => void
   onBack: () => void
   onEditProfile: () => void
   onEditPersonalInfo: () => void
@@ -26,9 +32,12 @@ interface Props {
 }
 
 export default function MyPageScreen({
-  session, demoLoggedIn, guardianName, petName, petPhoto, onBack, onEditProfile, onEditPersonalInfo, onLogout,
+  session, demoLoggedIn, guardianName, petName, petPhoto, avatarUrl, onAvatarChange, onBack, onEditProfile, onEditPersonalInfo, onLogout,
 }: Props) {
   const user = session?.user
+  const [avatarBusy, setAvatarBusy] = useState(false)
+  const [avatarError, setAvatarError] = useState('')
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
   // "Native" here means a real Supabase auth.identities row — Google/Kakao
   // (and email/password). Naver is deliberately NOT one of these (see the
   // naver-auth Edge Function) — we track it ourselves via user_metadata.
@@ -149,6 +158,42 @@ export default function MyPageScreen({
     }
   }
 
+  const handleAvatarFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+    setAvatarError('')
+
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('이미지 파일만 업로드할 수 있어요.')
+      return
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setAvatarError('파일 크기가 너무 커요. 8MB 이하의 이미지를 선택해 주세요.')
+      return
+    }
+
+    if (!SUPABASE_ENABLED || !supabase || !user) {
+      // Demo mode (or Supabase unreachable) — nothing to persist to, but
+      // still preview the chosen photo locally so the button doesn't feel
+      // broken.
+      onAvatarChange(URL.createObjectURL(file))
+      setAvatarError(demoLoggedIn ? '데모 로그인 상태에서는 사진이 저장되지 않아요.' : '')
+      return
+    }
+
+    setAvatarBusy(true)
+    try {
+      const url = await uploadAvatar(user.id, file)
+      onAvatarChange(url)
+    } catch (err) {
+      console.warn('프로필 사진 업로드 실패:', err)
+      setAvatarError('프로필 사진 업로드에 실패했어요. 잠시 후 다시 시도해 주세요.')
+    } finally {
+      setAvatarBusy(false)
+    }
+  }
+
   const identifier = user?.email ?? (demoLoggedIn ? '데모 로그인' : '')
   const showsSyntheticEmail = Boolean(user?.email?.endsWith('@users.peteed.app'))
   const canJumpToProvider = SUPABASE_ENABLED && Boolean(session) && currentProvider && (currentProvider in PROVIDER_META)
@@ -194,12 +239,48 @@ export default function MyPageScreen({
           style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
           onClick={onEditPersonalInfo}
         >
-          <div style={{
-            width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-            background: 'var(--paper-2)', color: 'var(--gold)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ transform: 'scale(1.3)' }}>{Icons.user('currentColor')}</span>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: '50%', overflow: 'hidden',
+              background: 'var(--paper-2)', color: 'var(--gold)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <img
+                src={avatarUrl}
+                alt=""
+                onError={e => { (e.currentTarget as HTMLImageElement).src = DEFAULT_AVATAR }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+            <button
+              onClick={e => { e.stopPropagation(); if (!avatarBusy) avatarInputRef.current?.click() }}
+              disabled={avatarBusy}
+              aria-label="프로필 사진 변경"
+              style={{
+                position: 'absolute', right: -2, bottom: -2,
+                width: 20, height: 20, borderRadius: '50%', padding: 0,
+                border: '2px solid #fff', background: 'var(--gold)', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: avatarBusy ? 'default' : 'pointer',
+              }}
+            >
+              {avatarBusy
+                ? <span style={{ width: 9, height: 9, borderRadius: '50%', border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', display: 'inline-block', animation: 'mp-spin .7s linear infinite' }} />
+                : (
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="3.5"/>
+                  </svg>
+                )}
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarFileChange}
+              onClick={e => e.stopPropagation()}
+              style={{ display: 'none' }}
+            />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p className="row-title" style={{ fontSize: 14 }}>{guardianName} 보호자님</p>
@@ -228,6 +309,11 @@ export default function MyPageScreen({
             <polyline points="9 18 15 12 9 6"/>
           </svg>
         </div>
+        {avatarError && (
+          <p style={{ margin: '4px 2px 0', fontSize: 11.5, fontWeight: 600, lineHeight: 1.6, color: '#C1442E' }}>
+            {avatarError}
+          </p>
+        )}
 
         {/* ── Pet info ── */}
         <div className="section-label">반려동물 정보</div>

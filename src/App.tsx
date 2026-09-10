@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactElement } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
 import { getMyPet, createMyPet, updateGuardianName, updatePetName, getPersonalInfo, updatePersonalInfo } from './lib/petData'
+import { DEFAULT_AVATAR } from './assets/defaultAvatar'
 import { HEALTH_RECORDS, type HealthRecord } from './data/healthRecords'
 import LoginScreen from './LoginScreen'
 import OnboardingScreen from './OnboardingScreen'
@@ -62,6 +63,9 @@ export default function App() {
   const [guardianName, setGuardianName] = useState('죠지')
   const [guardianPhone, setGuardianPhone] = useState('')
   const [guardianAddress, setGuardianAddress] = useState('')
+  // Falls back to the cartoon default avatar until the guardian uploads a
+  // real photo in My Page (see MyPageScreen's avatar upload).
+  const [guardianAvatar, setGuardianAvatar] = useState(DEFAULT_AVATAR)
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [showEditPersonalInfo, setShowEditPersonalInfo] = useState(false)
   const [showMyPage, setShowMyPage] = useState(false)
@@ -167,6 +171,7 @@ export default function App() {
         if (info.fullName) setGuardianName(info.fullName)
         setGuardianPhone(info.phone ?? '')
         setGuardianAddress(info.address ?? '')
+        setGuardianAvatar(info.avatarUrl || DEFAULT_AVATAR)
         if (pet) {
           setPetName(pet.name)
           setPetId(pet.id)
@@ -325,6 +330,8 @@ export default function App() {
               guardianName={guardianName}
               petName={petName}
               petPhoto={petPhoto}
+              avatarUrl={guardianAvatar}
+              onAvatarChange={setGuardianAvatar}
               onBack={() => setShowMyPage(false)}
               onEditProfile={() => setShowEditProfile(true)}
               onEditPersonalInfo={() => setShowEditPersonalInfo(true)}
@@ -356,6 +363,7 @@ export default function App() {
                 petBreed={petBreed}
                 petName={petName}
                 guardianName={guardianName}
+                avatarUrl={guardianAvatar}
                 onPhotoClick={() => setShowCamera(true)}
                 onQRClick={() => setShowQR(true)}
                 onViewAllClick={() => switchTab('health')}

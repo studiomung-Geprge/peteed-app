@@ -82,17 +82,19 @@ export interface PersonalInfo {
   fullName: string | null
   phone: string | null
   address: string | null
+  avatarUrl: string | null
 }
 
 // My Page's "개인 회원 정보 수정" panel — same `profiles` row as
 // getGuardianName/updateGuardianName, plus the optional phone/address
 // columns added for that panel (see the add_profile_phone_and_address
-// migration).
+// migration), plus the pre-existing avatar_url column (see uploadAvatar
+// below).
 export async function getPersonalInfo(userId: string): Promise<PersonalInfo> {
-  if (!supabase) return { fullName: null, phone: null, address: null }
+  if (!supabase) return { fullName: null, phone: null, address: null, avatarUrl: null }
   const { data, error } = await supabase
     .from('profiles')
-    .select('full_name, phone, address')
+    .select('full_name, phone, address, avatar_url')
     .eq('id', userId)
     .maybeSingle()
   if (error) throw error
@@ -100,6 +102,7 @@ export async function getPersonalInfo(userId: string): Promise<PersonalInfo> {
     fullName: data?.full_name ?? null,
     phone: data?.phone ?? null,
     address: data?.address ?? null,
+    avatarUrl: data?.avatar_url ?? null,
   }
 }
 
@@ -114,6 +117,45 @@ export async function updatePersonalInfo(userId: string, info: { fullName: strin
     })
     .eq('id', userId)
   if (error) throw error
+}
+
+const AVATAR_EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+}
+
+// My Page's profile-photo upload. Stores the image in the public "avatars"
+// Storage bucket at "<user id>/avatar.<ext>" — always the same path per
+// user (upsert: true), so a re-upload replaces the old file instead of
+// piling up orphaned ones — then saves the resulting public URL onto
+// profiles.avatar_url so it's picked up on every later login.
+export async function uploadAvatar(userId: string, file: File): Promise<string> {
+  if (!supabase) throw new Error('Supabase is not configured in this environment')
+
+  const ext = AVATAR_EXT_BY_MIME[file.type] ?? (file.name.split('.').pop() || 'jpg')
+  const path = `${userId}/avatar.${ext}`
+
+  const { error: uploadErr } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' })
+  if (uploadErr) throw uploadErr
+
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+  // The object path is reused on every re-upload, so the URL itself doesn't
+  // change — append a cache-busting query param so the browser (and other
+  // guardians viewing a shared pet) actually fetch the new image.
+  const publicUrl = `${data.publicUrl}?v=${Date.now()}`
+
+  const { error: updateErr } = await supabase
+    .from('profiles')
+    .update({ avatar_url: publicUrl })
+    .eq('id', userId)
+  if (updateErr) throw updateErr
+
+  return publicUrl
 }
 
 export interface FacilityRow {

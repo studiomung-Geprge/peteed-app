@@ -1,11 +1,13 @@
 import StampBadges from '../StampBadges'
 import { Icons } from '../icons'
+import { DEFAULT_AVATAR } from '../assets/defaultAvatar'
 
 interface Props {
   petPhoto: string
   petBreed: string
   petName: string
   guardianName: string
+  avatarUrl: string
   onPhotoClick: () => void
   onQRClick: () => void
   onViewAllClick: () => void
@@ -37,7 +39,7 @@ function QRCode({ size = 50 }: { size?: number }) {
   )
 }
 
-export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onPhotoClick, onQRClick, onViewAllClick, onQuickAction, onOpenMyPage }: Props) {
+export default function HomeTab({ petPhoto, petBreed, petName, guardianName, avatarUrl, onPhotoClick, onQRClick, onViewAllClick, onQuickAction, onOpenMyPage }: Props) {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
@@ -57,12 +59,17 @@ export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onP
           }}
         >
           <span style={{
-            width: 34, height: 34, borderRadius: '50%',
+            width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
             border: '1px solid var(--hair)', background: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--ink-45)',
           }}>
-            {Icons.user('currentColor')}
+            <img
+              src={avatarUrl}
+              alt=""
+              onError={e => { (e.currentTarget as HTMLImageElement).src = DEFAULT_AVATAR }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </span>
           <span style={{
             fontFamily: "'Roboto Mono', monospace", fontSize: 8.5, fontWeight: 700,
