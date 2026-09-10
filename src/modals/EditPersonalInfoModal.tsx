@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { openAddressSearch } from '../lib/daumPostcode'
 
 interface Props {
   guardianName: string
@@ -11,17 +12,37 @@ interface Props {
 export default function EditPersonalInfoModal({ guardianName, phone, address, onClose, onSave }: Props) {
   const [name, setName] = useState(guardianName)
   const [phoneVal, setPhoneVal] = useState(phone)
+  // 주소는 다음 우편번호 검색으로 채워지는 기본주소(읽기전용)와, 동/호수처럼
+  // 검색으로는 알 수 없는 나머지를 직접 입력하는 상세주소 두 칸으로 나뉜다.
+  // 기존에 저장된 주소는 두 값으로 나뉘어 있지 않으므로 일단 기본주소 칸에
+  // 그대로 불러와서 보여주고, 저장할 때 두 값을 합쳐 하나의 문자열로 만든다.
   const [addressVal, setAddressVal] = useState(address)
+  const [addressDetail, setAddressDetail] = useState('')
+  const [addressError, setAddressError] = useState('')
   const [nameError, setNameError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const handleAddressSearch = async () => {
+    setAddressError('')
+    try {
+      await openAddressSearch(result => {
+        setAddressVal(result.roadAddress || result.jibunAddress || result.address)
+      })
+    } catch (err) {
+      console.warn('주소 검색 실패:', err)
+      setAddressError('주소 검색을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')
+    }
+  }
 
   const submit = async () => {
     if (!name.trim()) { setNameError('이름을 입력해 주세요'); return }
     setNameError('')
 
+    const combinedAddress = [addressVal.trim(), addressDetail.trim()].filter(Boolean).join(' ')
+
     setSaving(true)
     try {
-      await onSave(name.trim(), phoneVal.trim(), addressVal.trim())
+      await onSave(name.trim(), phoneVal.trim(), combinedAddress)
     } finally {
       setSaving(false)
     }
@@ -133,14 +154,46 @@ export default function EditPersonalInfoModal({ guardianName, phone, address, on
                 선택사항
               </span>
             </label>
-            <div className="epi-input-wrap">
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div className="epi-input-wrap" style={{ flex: 1 }}>
+                <input
+                  className="epi-input"
+                  type="text"
+                  placeholder="주소 검색을 눌러 주소를 찾아 주세요"
+                  value={addressVal}
+                  readOnly
+                  onClick={handleAddressSearch}
+                  style={{ cursor: 'pointer', background: '#FFF9F6' }}
+                  autoComplete="off"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddressSearch}
+                style={{
+                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '0 14px', borderRadius: 13,
+                  border: '1.8px solid #E8D5CE', background: '#fff',
+                  color: '#7A5C52', cursor: 'pointer',
+                  fontFamily: "'Noto Sans KR',sans-serif", fontSize: 12.5, fontWeight: 700,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                검색
+              </button>
+            </div>
+            {addressError && <p style={{ fontSize: 11, color: '#E8521F', margin: '4px 4px 0', fontWeight: 700 }}>{addressError}</p>}
+
+            <div className="epi-input-wrap" style={{ marginTop: 8 }}>
               <input
                 className="epi-input"
                 type="text"
-                placeholder="예: 경상북도 안동시 ..."
-                value={addressVal}
-                onChange={e => setAddressVal(e.target.value)}
-                autoComplete="street-address"
+                placeholder="상세주소 (동/호수 등, 선택)"
+                value={addressDetail}
+                onChange={e => setAddressDetail(e.target.value)}
+                autoComplete="address-line2"
               />
             </div>
           </div>
