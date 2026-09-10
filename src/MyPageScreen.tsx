@@ -143,11 +143,12 @@ export default function MyPageScreen({
       }
       setMessage({ type: 'info', text: `${PROVIDER_META[p].label} 연결을 해제했어요.` })
     } catch (err) {
+      // Log the raw (often English) Supabase/network error for debugging,
+      // but never show it directly — always surface our own Korean copy.
       console.warn(`${p} 연결 해제 실패:`, err)
-      const raw = err instanceof Error ? err.message : ''
       setMessage({
         type: 'error',
-        text: raw || `${PROVIDER_META[p].label} 연결 해제에 실패했어요.`,
+        text: `${PROVIDER_META[p].label} 연결 해제에 실패했어요. 잠시 후 다시 시도해 주세요.`,
       })
     } finally {
       setBusy(null)
@@ -358,24 +359,43 @@ export default function MyPageScreen({
                       </p>
                       <p className="row-sub">{connected ? '연결됨' : '연결 안 됨'}</p>
                     </div>
+                    {/* 연동 완료 = ON. OFF에서 누르면 해당 플랫폼 연동 창이 뜨고,
+                        ON에서 누르면 바로 연동 해제됨 — 스위치 하나로 상태와
+                        동작을 함께 보여준다. */}
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={connected}
+                      aria-label={`${meta.label} 계정 연동 ${connected ? '해제' : '켜기'}`}
                       onClick={() => connected ? handleDisconnect(p) : handleConnect(p)}
                       disabled={isBusy}
                       style={{
-                        flexShrink: 0,
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '7px 12px', borderRadius: 20,
-                        border: connected ? '1.5px solid var(--hair)' : '1.5px solid var(--gold)',
-                        background: connected ? '#fff' : 'var(--gold)',
-                        color: connected ? 'var(--ink-70)' : '#fff',
-                        fontFamily: "'Noto Sans KR', sans-serif", fontSize: 11.5, fontWeight: 700,
+                        flexShrink: 0, position: 'relative',
+                        width: 46, height: 26, padding: 2, borderRadius: 13,
+                        border: connected ? 'none' : '1.5px solid var(--hair)',
+                        background: connected ? '#3a7d4f' : 'var(--paper-2)',
                         cursor: isBusy ? 'default' : 'pointer',
                         opacity: isBusy ? 0.65 : 1,
+                        transition: 'background .18s ease',
                       }}
                     >
-                      {isBusy
-                        ? <span style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(0,0,0,.2)', borderTopColor: connected ? 'var(--ink-45)' : '#fff', display: 'inline-block', animation: 'mp-spin .7s linear infinite' }} />
-                        : connected ? '해제' : '연결'}
+                      {isBusy ? (
+                        <span style={{
+                          position: 'absolute', top: '50%', left: '50%',
+                          width: 13, height: 13, marginTop: -6.5, marginLeft: -6.5,
+                          borderRadius: '50%',
+                          border: `2px solid ${connected ? 'rgba(255,255,255,.4)' : 'rgba(28,28,26,.15)'}`,
+                          borderTopColor: connected ? '#fff' : 'var(--ink-45)',
+                          animation: 'mp-spin .7s linear infinite',
+                        }} />
+                      ) : (
+                        <span style={{
+                          display: 'block', width: 21, height: 21, borderRadius: '50%',
+                          background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)',
+                          transform: connected ? 'translateX(19px)' : 'translateX(0)',
+                          transition: 'transform .18s ease',
+                        }} />
+                      )}
                     </button>
                   </div>
                 </div>
