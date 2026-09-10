@@ -45,9 +45,6 @@ export default function MyPageScreen({
   const [naverConnected, setNaverConnected] = useState<boolean>(Boolean(user?.user_metadata?.naver_id))
   const [busy, setBusy] = useState<ProviderKey | null>(null)
   const [message, setMessage] = useState<{ type: 'error' | 'info'; text: string } | null>(null)
-  const [highlighted, setHighlighted] = useState<ProviderKey | null>(null)
-  const providerRowRefs = useRef<Record<ProviderKey, HTMLDivElement | null>>({ google: null, kakao: null, naver: null })
-  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refreshIdentities = useCallback(async () => {
     if (!supabase || !session) return
@@ -60,24 +57,11 @@ export default function MyPageScreen({
     setNaverConnected(Boolean(user?.user_metadata?.naver_id))
   }, [user?.user_metadata?.naver_id])
 
-  useEffect(() => () => {
-    if (highlightTimer.current) clearTimeout(highlightTimer.current)
-  }, [])
-
   const isConnected = (p: ProviderKey) =>
     p === 'naver' ? naverConnected : nativeProviders.includes(p)
 
   const connectedCount = (['google', 'kakao', 'naver'] as ProviderKey[]).filter(isConnected).length
   const currentProvider = (user?.app_metadata?.provider as string | undefined) ?? null
-
-  const jumpToProvider = (p: ProviderKey) => {
-    const el = providerRowRefs.current[p]
-    if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setHighlighted(p)
-    if (highlightTimer.current) clearTimeout(highlightTimer.current)
-    highlightTimer.current = setTimeout(() => setHighlighted(null), 1600)
-  }
 
   const handleConnect = async (p: ProviderKey) => {
     if (!supabase || !session) return
@@ -196,7 +180,6 @@ export default function MyPageScreen({
 
   const identifier = user?.email ?? (demoLoggedIn ? '데모 로그인' : '')
   const showsSyntheticEmail = Boolean(user?.email?.endsWith('@users.peteed.app'))
-  const canJumpToProvider = SUPABASE_ENABLED && Boolean(session) && currentProvider && (currentProvider in PROVIDER_META)
 
   return (
     <div style={{
@@ -208,11 +191,6 @@ export default function MyPageScreen({
       <style>{`
         @keyframes mp-in { from { opacity:0; transform: translateX(16px) } to { opacity:1; transform: translateX(0) } }
         @keyframes mp-spin { to { transform: rotate(360deg) } }
-        @keyframes mp-highlight {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,74,0); }
-          20%, 60% { box-shadow: 0 0 0 3px rgba(255,107,74,.45); }
-        }
-        .mp-row-highlight { animation: mp-highlight 1.6s ease; border-radius: 16px; }
       `}</style>
 
       <div style={{ flexShrink: 0, height: 54 }} />
@@ -288,23 +266,19 @@ export default function MyPageScreen({
               {showsSyntheticEmail ? '네이버 계정 (이메일 미동의)' : identifier}
             </p>
           </div>
-          {currentProvider && (
-            <span
-              className="chip"
-              onClick={e => {
-                if (!canJumpToProvider) return
-                e.stopPropagation()
-                jumpToProvider(currentProvider as ProviderKey)
-              }}
-              style={{
-                background: PROVIDER_META[currentProvider as ProviderKey]?.chipBg ?? 'var(--paper-2)',
-                color: PROVIDER_META[currentProvider as ProviderKey]?.color ?? 'var(--ink-70)',
-                cursor: canJumpToProvider ? 'pointer' : 'default',
-              }}
-            >
-              {PROVIDER_META[currentProvider as ProviderKey]?.label ?? currentProvider} 로그인 중
-            </span>
-          )}
+          {/* 카드 전체가 개인정보 수정으로 이동하는 버튼이라는 걸 보여주는
+              수정 아이콘 + 화살표. "로그인 중" 배지는 계정 연동 목록의 해당
+              제공자 행으로 옮겼다(아래 참고). */}
+          <span style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+            background: 'var(--paper-2)', color: 'var(--ink-45)',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/>
+            </svg>
+          </span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-45)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
             <polyline points="9 18 15 12 9 6"/>
           </svg>
@@ -350,12 +324,9 @@ export default function MyPageScreen({
               const meta = PROVIDER_META[p]
               const isBusy = busy === p
               const Icon = meta.icon
+              const isCurrent = p === currentProvider
               return (
-                <div
-                  key={p}
-                  ref={el => { providerRowRefs.current[p] = el }}
-                  className={`card${highlighted === p ? ' mp-row-highlight' : ''}`}
-                >
+                <div key={p} className="card">
                   <div className="row">
                     <div style={{
                       width: 34, height: 34, borderRadius: 10, flexShrink: 0,
@@ -365,7 +336,14 @@ export default function MyPageScreen({
                       <Icon />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p className="row-title">{meta.label}</p>
+                      <p className="row-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {meta.label}
+                        {isCurrent && (
+                          <span className="chip" style={{ background: meta.chipBg, color: meta.color }}>
+                            로그인 중
+                          </span>
+                        )}
+                      </p>
                       <p className="row-sub">{connected ? '연결됨' : '연결 안 됨'}</p>
                     </div>
                     <button
