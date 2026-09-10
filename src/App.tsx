@@ -156,6 +156,41 @@ export default function App() {
       .finally(cleanUrl)
   }, [])
 
+  // Google/Kakao's 계정 연동 (linkIdentity) leaves the page for the
+  // provider's consent screen and then Supabase's own OAuth callback —
+  // unlike the Naver flow above, a failure there (most commonly: this
+  // Google/Kakao account already belongs to a *different* existing user)
+  // isn't something our own code throws or catches. Supabase reports it by
+  // redirecting back here with its own `error`/`error_description` in the
+  // URL, which supabase-js doesn't surface to app code on its own — so
+  // without this, a failed link attempt just silently goes nowhere. We
+  // parse it ourselves, translate it to Korean, and hand it to My Page the
+  // same way naver_link_error does.
+  useEffect(() => {
+    if (!SUPABASE_ENABLED || !supabase) return
+    const search = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const rawError = search.get('error') || hash.get('error')
+    const rawDescription = search.get('error_description') || hash.get('error_description')
+    if (!rawError && !rawDescription) return
+
+    console.warn('계정 연동 OAuth 오류:', rawError, rawDescription)
+    const lower = `${rawError ?? ''} ${rawDescription ?? ''}`.toLowerCase()
+    const text = lower.includes('manual linking')
+      ? '계정 연동 기능이 아직 서버에서 활성화되지 않았어요. 관리자에게 문의해 주세요.'
+      : lower.includes('already') || lower.includes('exists') || lower.includes('registered')
+        ? '이 계정은 이미 다른 계정에 연결되어 있어요. 그 계정에서 먼저 연결을 해제한 뒤 다시 시도해 주세요.'
+        : '계정 연동에 실패했어요. 잠시 후 다시 시도해 주세요.'
+    sessionStorage.setItem('mypage_link_error', text)
+
+    const url = new URL(window.location.href)
+    for (const key of ['error', 'error_code', 'error_description']) url.searchParams.delete(key)
+    hash.delete('error'); hash.delete('error_code'); hash.delete('error_description')
+    const remainingHash = hash.toString()
+    url.hash = remainingHash ? `#${remainingHash}` : ''
+    window.history.replaceState({}, '', url.toString())
+  }, [])
+
   // My Page sets this flag right before sending the browser off to link a
   // Google/Kakao/Naver account (any of those redirects leave the page
   // entirely, so plain in-memory state wouldn't survive the round trip). On

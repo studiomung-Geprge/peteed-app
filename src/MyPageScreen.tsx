@@ -6,6 +6,8 @@ import { uploadAvatar } from './lib/petData'
 import { Icons } from './icons'
 import { GoogleIcon, KakaoIcon, NaverIcon } from './components/ProviderIcons'
 import { DEFAULT_AVATAR } from './assets/defaultAvatar'
+import AccountMergeInfoModal from './modals/AccountMergeInfoModal'
+import ConfirmDisconnectModal from './modals/ConfirmDisconnectModal'
 
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024
 
@@ -45,6 +47,9 @@ export default function MyPageScreen({
   const [naverConnected, setNaverConnected] = useState<boolean>(Boolean(user?.user_metadata?.naver_id))
   const [busy, setBusy] = useState<ProviderKey | null>(null)
   const [message, setMessage] = useState<{ type: 'error' | 'info'; text: string } | null>(null)
+  const [showMergeInfo, setShowMergeInfo] = useState(false)
+  // OFF 스위치를 누르면 바로 해제하지 않고 먼저 이 확인 팝업을 띄운다.
+  const [confirmDisconnect, setConfirmDisconnect] = useState<ProviderKey | null>(null)
 
   const refreshIdentities = useCallback(async () => {
     if (!supabase || !session) return
@@ -153,6 +158,13 @@ export default function MyPageScreen({
     } finally {
       setBusy(null)
     }
+  }
+
+  const confirmDisconnectProvider = async () => {
+    const p = confirmDisconnect
+    if (!p) return
+    await handleDisconnect(p)
+    setConfirmDisconnect(null)
   }
 
   const handleAvatarFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -329,9 +341,29 @@ export default function MyPageScreen({
           </div>
         ) : (
           <>
-            <p className="sub" style={{ margin: '0 0 12px' }}>
+            <p className="sub" style={{ margin: '0 0 6px' }}>
               구글·카카오·네이버 중 어떤 계정으로 로그인하더라도 같은 계정으로 이어져요. 여기서 계정을 추가로 연결하거나 해제할 수 있어요.
             </p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, margin: '0 0 12px' }}>
+              <p className="sub" style={{ margin: 0, flex: 1 }}>
+                단, 로그인 이메일이 서로 다른 계정끼리는 자동으로 합쳐지지 않아요 — 아래 스위치로 직접 연결해야 해요.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowMergeInfo(true)}
+                aria-label="계정 통합 안내 보기"
+                style={{
+                  flexShrink: 0, width: 18, height: 18, marginTop: 1, padding: 0,
+                  borderRadius: '50%', border: '1.5px solid var(--ink-45)',
+                  background: 'transparent', color: 'var(--ink-45)',
+                  fontFamily: "'Noto Sans KR', sans-serif", fontSize: 11, fontWeight: 800, lineHeight: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                ?
+              </button>
+            </div>
             {(['google', 'kakao', 'naver'] as ProviderKey[]).map(p => {
               const connected = isConnected(p)
               const meta = PROVIDER_META[p]
@@ -360,14 +392,14 @@ export default function MyPageScreen({
                       <p className="row-sub">{connected ? '연결됨' : '연결 안 됨'}</p>
                     </div>
                     {/* 연동 완료 = ON. OFF에서 누르면 해당 플랫폼 연동 창이 뜨고,
-                        ON에서 누르면 바로 연동 해제됨 — 스위치 하나로 상태와
-                        동작을 함께 보여준다. */}
+                        ON에서 누르면 확인 팝업을 먼저 띄운 뒤 연동 해제됨 —
+                        스위치 하나로 상태와 동작을 함께 보여준다. */}
                     <button
                       type="button"
                       role="switch"
                       aria-checked={connected}
                       aria-label={`${meta.label} 계정 연동 ${connected ? '해제' : '켜기'}`}
-                      onClick={() => connected ? handleDisconnect(p) : handleConnect(p)}
+                      onClick={() => connected ? setConfirmDisconnect(p) : handleConnect(p)}
                       disabled={isBusy}
                       style={{
                         flexShrink: 0, position: 'relative',
@@ -427,6 +459,16 @@ export default function MyPageScreen({
           로그아웃
         </button>
       </div>
+
+      {showMergeInfo && <AccountMergeInfoModal onClose={() => setShowMergeInfo(false)} />}
+      {confirmDisconnect && (
+        <ConfirmDisconnectModal
+          label={PROVIDER_META[confirmDisconnect].label}
+          busy={busy === confirmDisconnect}
+          onCancel={() => setConfirmDisconnect(null)}
+          onConfirm={confirmDisconnectProvider}
+        />
+      )}
     </div>
   )
 }

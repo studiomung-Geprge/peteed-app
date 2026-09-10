@@ -84,6 +84,19 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           }
           throw error
         }
+        // Supabase deliberately does NOT return an error when the email is
+        // already registered — to avoid leaking which emails exist, it
+        // returns a fake "success" with no session and a user whose
+        // identities array is empty (no confirmation email is actually
+        // sent). A genuinely new signup's user always has at least one
+        // identity, so an empty array is the documented way to tell the
+        // two apart client-side — without this, the screen shows "인증
+        // 메일을 보냈어요" for an email that was never sent anything.
+        if (data.user && data.user.identities?.length === 0) {
+          setLoading(false)
+          setEmailError('이미 가입된 이메일이에요. 로그인해 주세요')
+          return
+        }
         setLoading(false)
         if (!data.session) {
           // Email confirmation is required — Supabase just sent the link.
