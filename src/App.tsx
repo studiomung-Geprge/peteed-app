@@ -5,6 +5,7 @@ import { getMyPet, createMyPet, updateGuardianName, updatePetName, getPersonalIn
 import { DEFAULT_AVATAR } from './assets/defaultAvatar'
 import { HEALTH_RECORDS, type HealthRecord } from './data/healthRecords'
 import LoginScreen from './LoginScreen'
+import ResetPasswordScreen from './ResetPasswordScreen'
 import OnboardingScreen from './OnboardingScreen'
 import MyPageScreen from './MyPageScreen'
 import QRModal from './QRModal'
@@ -45,6 +46,10 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [demoLoggedIn, setDemoLoggedIn] = useState(false)
   const loggedIn = Boolean(session) || demoLoggedIn
+  // True once we detect this page load is a "reset your password" return
+  // trip (see the two effects below) — takes over the screen instead of
+  // the normal login/home flow until the user sets a new password.
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [showQR, setShowQR] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
@@ -77,10 +82,27 @@ export default function App() {
   useEffect(() => {
     if (!SUPABASE_ENABLED || !supabase) return
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession)
+      // Fired when the user arrives via ForgotPasswordModal's reset-password
+      // link — Supabase's client parsed a one-time recovery token from the
+      // URL and set a temporary session for it. Hand off to
+      // ResetPasswordScreen instead of dropping them straight into the app.
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
     })
     return () => sub.subscription.unsubscribe()
+  }, [])
+
+  // Belt-and-suspenders for the same recovery return trip: this client
+  // library can fire PASSWORD_RECOVERY (above) before this component's
+  // effects have subscribed to onAuthStateChange, since parsing the token
+  // out of the URL happens as soon as the Supabase client is created —
+  // which is on module import, ahead of this component's first render. so
+  // also check the URL directly; whichever of the two fires first wins.
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    if (hash.get('type') === 'recovery') setPasswordRecovery(true)
   }, [])
 
   // Naver return trip: unlike Google/Kakao (native Supabase OAuth providers,
@@ -275,6 +297,10 @@ export default function App() {
     setGuardianPhone(newPhone)
     setGuardianAddress(newAddress)
     setShowEditPersonalInfo(false)
+  }
+
+  if (passwordRecovery) {
+    return <ResetPasswordScreen onDone={() => setPasswordRecovery(false)} />
   }
 
   if (!loggedIn) return <LoginScreen onLogin={() => setDemoLoggedIn(true)} />

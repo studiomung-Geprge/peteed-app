@@ -3,6 +3,7 @@ import PeteedLogo from './PeteedLogo'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
 import { startNaverLogin } from './lib/naverAuth'
 import { GoogleIcon, KakaoIcon, NaverIcon } from './components/ProviderIcons'
+import ForgotPasswordModal from './modals/ForgotPasswordModal'
 
 interface LoginScreenProps {
   onLogin: () => void
@@ -38,6 +39,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [pw2Error, setPw2Error] = useState('')
   const [loading, setLoading] = useState(false)
   const [pendingConfirm, setPendingConfirm] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
 
   const switchMode = (next: 'login' | 'signup') => {
     setMode(next)
@@ -245,6 +247,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
       <div className="pl-device">
         <div className="pl-screen" style={{ background: '#FFF8F5' }}>
+          {showForgotPassword && (
+            <ForgotPasswordModal initialEmail={email} onClose={() => setShowForgotPassword(false)} />
+          )}
           <div className="pl-dyn-island" />
 
           {/* Status bar */}
@@ -362,7 +367,12 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
                   {mode === 'login' && (
                     <div style={{ textAlign: 'right', marginTop: -2 }}>
-                      <span style={{ fontSize: 11.5, color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}>비밀번호 찾기</span>
+                      <span
+                        onClick={() => setShowForgotPassword(true)}
+                        style={{ fontSize: 11.5, color: '#FF6B4A', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        비밀번호 찾기
+                      </span>
                     </div>
                   )}
 
