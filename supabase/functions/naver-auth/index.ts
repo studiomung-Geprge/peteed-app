@@ -96,7 +96,8 @@ Deno.serve(async (req: Request) => {
     // pages of users — fine at PETEED's current scale; worth revisiting
     // (e.g. a naver_id lookup table) if the user base grows into the
     // thousands.
-    let user: { id: string; email?: string } | undefined;
+    // deno-lint-ignore no-explicit-any
+    let user: any | undefined;
     let page = 1;
     while (!user) {
       const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
@@ -128,6 +129,34 @@ Deno.serve(async (req: Request) => {
         return backToApp({ naver_error: "회원 정보를 만들지 못했어요", state });
       }
       user = created.user;
+    } else {
+      // Same person, same email, different provider than last time (e.g. this
+      // account was originally created via Kakao/Google, and their Naver
+      // account happens to share that email). Rather than splitting them into
+      // two accounts, we sign them into the existing one — but refresh
+      // provider/app_metadata so the dashboard reflects Naver as the most
+      // recently used provider, not whichever one created the account.
+      const existingProviders: string[] = Array.isArray(user.app_metadata?.providers)
+        ? user.app_metadata.providers
+        : [];
+      const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
+        app_metadata: {
+          ...user.app_metadata,
+          provider: "naver",
+          providers: Array.from(new Set([...existingProviders, "naver"])),
+        },
+        user_metadata: {
+          ...user.user_metadata,
+          naver_id: naverId,
+          full_name: name,
+          avatar_url: p.profile_image ?? user.user_metadata?.avatar_url ?? null,
+        },
+      });
+      if (updateErr) {
+        // Non-fatal — worst case the dashboard's provider label is stale,
+        // but the login itself still succeeds below.
+        console.error("updateUserById (provider refresh) failed:", updateErr);
+      }
     }
 
     // 4) Mint a one-time magic-link token the client can redeem for a session.
