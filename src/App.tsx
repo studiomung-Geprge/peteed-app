@@ -73,6 +73,49 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  // Naver login return trip: unlike Google/Kakao (native Supabase OAuth
+  // providers, whose session Supabase's own SDK detects automatically), Naver
+  // is bridged through our own `naver-auth` Edge Function, which redirects
+  // back here with a one-time `naver_token` in the URL. Redeem it for a real
+  // Supabase session, then scrub the URL so the token doesn't linger in the
+  // address bar/history.
+  useEffect(() => {
+    if (!SUPABASE_ENABLED || !supabase) return
+    const params = new URLSearchParams(window.location.search)
+    const naverToken = params.get('naver_token')
+    const naverError = params.get('naver_error')
+    const returnedState = params.get('state')
+    if (!naverToken && !naverError) return
+
+    const cleanUrl = () => {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('naver_token')
+      url.searchParams.delete('naver_error')
+      url.searchParams.delete('state')
+      window.history.replaceState({}, '', url.toString())
+    }
+
+    if (naverError) {
+      console.warn('Naver 로그인 실패:', naverError)
+      cleanUrl()
+      return
+    }
+
+    const expectedState = sessionStorage.getItem('naver_oauth_state')
+    sessionStorage.removeItem('naver_oauth_state')
+    if (expectedState && returnedState && expectedState !== returnedState) {
+      console.warn('Naver 로그인 상태값이 일치하지 않아요 — 무시합니다.')
+      cleanUrl()
+      return
+    }
+
+    supabase.auth.verifyOtp({ token_hash: naverToken!, type: 'magiclink' })
+      .then(({ error }) => {
+        if (error) console.warn('Naver 로그인 세션 발급 실패:', error)
+      })
+      .finally(cleanUrl)
+  }, [])
+
   // On login for a real Supabase user, check whether they already have a
   // pet on file. If not, this is their first time in — show the onboarding
   // form instead of a hardcoded "만두" placeholder.

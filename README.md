@@ -81,9 +81,33 @@ npm run build
   3. 배포된 앱(`https://peteed-app-web.vercel.app`)에서 "구글로 시작하기" 버튼을 누르면
      실제 구글 로그인 화면으로 이동 → 로그인 후 앱으로 자동 복귀하며 세션 생성
 
-  카카오/네이버 버튼은 아직 시뮬레이션(즉시 로그인)으로 남아있습니다. 카카오는 구글과 동일한
-  방식(Supabase 기본 지원 프로바이더)으로 추가할 수 있고, 네이버는 Supabase가 기본 지원하지
-  않아 "Custom OAuth/OIDC Providers" 기능으로 별도 설정이 필요합니다.
+  **카카오 버튼도 실제 `supabase.auth.signInWithOAuth({ provider: 'kakao' })`로 연동되어
+  있습니다.** Supabase가 카카오를 기본 지원하므로 구글과 동일한 방식이며, Kakao Developers에서
+  앱을 "개인 개발자 비즈 앱"으로 전환(이메일 동의 항목 사용을 위해 필요)하고 Supabase 대시보드
+  → Authentication → Providers → Kakao에 Client ID/Secret을 넣고 **"Allow users without an
+  email"을 켜두면** 동작합니다.
+
+  **네이버는 Supabase가 기본 지원하는 프로바이더 목록에 없어서** ("Custom OAuth/OIDC
+  Providers"로도 안 됨 — OIDC를 지원하지 않음), 자체 Supabase Edge Function
+  (`supabase/functions/naver-auth`)으로 직접 연동했습니다:
+  1. **Naver Developers** (https://developers.naver.com/apps/#/register) 에서 애플리케이션
+     등록 → 사용 API에 "네이버 로그인" 추가
+     - 서비스 URL: `https://peteed-app-web.vercel.app`
+     - 콜백 URL: `https://aomtxgrrmdkvzwxllcys.supabase.co/functions/v1/naver-auth`
+     - 발급된 **Client ID**, **Client Secret** 복사
+  2. **Supabase 대시보드 → Edge Functions → naver-auth → Secrets**에 등록:
+     - `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` (Naver Developers에서 복사한 값)
+     - `APP_ORIGIN` (선택, 기본값 `https://peteed-app-web.vercel.app`) — 다른 배포 주소를
+       쓸 경우에만 지정
+  3. `.env`(로컬) / Vercel 프로젝트 환경변수에 `VITE_NAVER_CLIENT_ID`로 위 Client ID(공개 값)를
+     추가
+  4. 동작 방식: "네이버로 시작하기" 클릭 → 네이버 로그인 화면으로 이동 → 동의 후 Naver가
+     `naver-auth` Edge Function으로 리다이렉트 → 함수가 인증코드를 네이버 액세스 토큰으로
+     교환하고, 네이버 프로필로 Supabase 사용자를 찾거나 새로 만든 뒤(이메일 동의를 안 했으면
+     `naver_<네이버ID>@users.peteed.app` 형태로 대체) 1회용 매직링크 토큰을 발급 →
+     `?naver_token=...`을 붙여 앱으로 복귀 → `App.tsx`가 `supabase.auth.verifyOtp()`로 이
+     토큰을 실제 로그인 세션으로 교환합니다. Client Secret과 Supabase 서비스 롤 키는 모두
+     Edge Function 안에서만 쓰이고 브라우저에는 절대 노출되지 않습니다.
 - **DB 스키마** (`public` 스키마, 전부 RLS 활성화):
   `profiles`(보호자), `pets`, `pet_guardians`(반려동물↔보호자 다대다), `health_records`,
   `facilities`(공공시설, 목업과 동일한 4곳 시드 완료), `facility_reservations`, `notifications`,

@@ -176,6 +176,37 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
   }
 
+  const handleNaverLogin = () => {
+    if (!SUPABASE_ENABLED || !supabase) {
+      // No backend configured — keep the original simulated flow.
+      onLogin()
+      return
+    }
+
+    // Naver isn't a built-in Supabase Auth provider (unlike Google/Kakao), so
+    // this app talks to it directly: redirect to Naver's own consent screen,
+    // and our `naver-auth` Supabase Edge Function (registered as Naver's
+    // 콜백 URL) exchanges the code and hands a session back to App.tsx.
+    const clientId = import.meta.env.VITE_NAVER_CLIENT_ID as string | undefined
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+    if (!clientId || !supabaseUrl) {
+      console.warn('Naver login: VITE_NAVER_CLIENT_ID이 설정되지 않았어요.')
+      onLogin()
+      return
+    }
+
+    const state = crypto.randomUUID()
+    sessionStorage.setItem('naver_oauth_state', state)
+
+    const redirectUri = `${supabaseUrl}/functions/v1/naver-auth`
+    const authorizeUrl = new URL('https://nid.naver.com/oauth2.0/authorize')
+    authorizeUrl.searchParams.set('response_type', 'code')
+    authorizeUrl.searchParams.set('client_id', clientId)
+    authorizeUrl.searchParams.set('redirect_uri', redirectUri)
+    authorizeUrl.searchParams.set('state', state)
+    window.location.href = authorizeUrl.toString()
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <style>{`
@@ -382,7 +413,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 <KakaoIcon />
                 <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: 'rgba(0,0,0,.85)', marginRight: 22 }}>카카오로 시작하기</span>
               </button>
-              <button className="social-btn" onClick={onLogin} style={{ background: '#03C75A', boxShadow: '0 4px 12px -6px rgba(3,199,90,.4)' }}>
+              <button className="social-btn" onClick={handleNaverLogin} style={{ background: '#03C75A', boxShadow: '0 4px 12px -6px rgba(3,199,90,.4)' }}>
                 <NaverIcon />
                 <span style={{ flex: 1, textAlign: 'center', fontFamily: "'Noto Sans KR',sans-serif", fontWeight: 700, fontSize: 13.5, color: '#fff', marginRight: 22 }}>네이버로 시작하기</span>
               </button>
