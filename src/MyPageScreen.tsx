@@ -373,7 +373,7 @@ export default function MyPageScreen({
                         flexShrink: 0, position: 'relative',
                         width: 46, height: 26, padding: 2, borderRadius: 13,
                         border: connected ? 'none' : '1.5px solid var(--hair)',
-                        background: connected ? '#3a7d4f' : 'var(--paper-2)',
+                        background: connected ? 'var(--gold)' : 'var(--paper-2)',
                         cursor: isBusy ? 'default' : 'pointer',
                         opacity: isBusy ? 0.65 : 1,
                         transition: 'background .18s ease',
