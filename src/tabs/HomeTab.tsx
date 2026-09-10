@@ -10,7 +10,7 @@ interface Props {
   onQRClick: () => void
   onViewAllClick: () => void
   onQuickAction: (key: 'health' | 'facilities' | 'missing' | 'blood') => void
-  onLogout: () => void
+  onOpenMyPage: () => void
 }
 
 function QRCode({ size = 50 }: { size?: number }) {
@@ -37,7 +37,7 @@ function QRCode({ size = 50 }: { size?: number }) {
   )
 }
 
-export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onPhotoClick, onQRClick, onViewAllClick, onQuickAction, onLogout }: Props) {
+export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onPhotoClick, onQRClick, onViewAllClick, onQuickAction, onOpenMyPage }: Props) {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
@@ -47,9 +47,9 @@ export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onP
           <p className="sub">경상북도 안동시 · 오늘도 {petName}와 좋은 하루 보내세요</p>
         </div>
         <button
-          onClick={onLogout}
-          title="로그아웃"
-          aria-label="로그아웃"
+          onClick={onOpenMyPage}
+          title="마이페이지"
+          aria-label="마이페이지"
           style={{
             flexShrink: 0, marginTop: 1,
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
@@ -62,13 +62,13 @@ export default function HomeTab({ petPhoto, petBreed, petName, guardianName, onP
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--ink-45)',
           }}>
-            {Icons.logout('currentColor')}
+            {Icons.user('currentColor')}
           </span>
           <span style={{
             fontFamily: "'Roboto Mono', monospace", fontSize: 8.5, fontWeight: 700,
             letterSpacing: '.06em', color: 'var(--ink-45)', whiteSpace: 'nowrap',
           }}>
-            LOG OUT
+            MY PAGE
           </span>
         </button>
       </div>

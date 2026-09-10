@@ -7,12 +7,18 @@
 //   1. Exchange the authorization code for a Naver access token (using our
 //      NAVER_CLIENT_SECRET — this must stay server-side, never in the app).
 //   2. Fetch the user's Naver profile.
-//   3. Find or create a matching Supabase auth user (via the service-role
-//      Admin API) and mint a one-time magic-link token for them.
-//   4. Redirect the browser back to the app with that token in the URL.
-//      App.tsx picks it up and calls supabase.auth.verifyOtp() to turn it
-//      into a real signed-in session — after that everything (RLS, auth.uid(),
-//      onboarding) works exactly like a Google/Kakao login.
+//   3a. LOGIN mode (default): find or create a matching Supabase auth user
+//      (via the service-role Admin API) and mint a one-time magic-link token
+//      for them, then redirect back with `naver_token` in the URL — App.tsx
+//      picks it up and calls supabase.auth.verifyOtp() to turn it into a
+//      real signed-in session, exactly like a Google/Kakao login.
+//   3b. LINK mode: if `state` matches a live row in `oauth_link_tickets`
+//      (minted by naver-link-start for an *already signed-in* My Page user
+//      who clicked "네이버 연결"), we don't mint a new session — we attach
+//      this Naver account to that user's existing account and redirect back
+//      with `naver_linked=1`. The browser's existing Supabase session is
+//      untouched throughout (it never left localStorage), so no re-auth is
+//      needed — My Page just needs to refresh the user's metadata.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -91,6 +97,81 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
+    // 2.5) Is `state` a live account-linking ticket (My Page → "네이버 연결"),
+    // rather than a normal login's random CSRF token? Consume it either way
+    // so it can never be replayed.
+    let linkTicketUserId: string | null = null;
+    if (state) {
+      const { data: ticketRow } = await admin
+        .from("oauth_link_tickets")
+        .select("id, user_id, expires_at")
+        .eq("id", state)
+        .maybeSingle();
+      if (ticketRow) {
+        await admin.from("oauth_link_tickets").delete().eq("id", ticketRow.id);
+        if (new Date(ticketRow.expires_at).getTime() > Date.now()) {
+          linkTicketUserId = ticketRow.user_id;
+        }
+      }
+    }
+
+    if (linkTicketUserId) {
+      // ---- LINK MODE ----
+      // Make sure this Naver account isn't already tied to a *different*
+      // Supabase user before we attach it here.
+      // deno-lint-ignore no-explicit-any
+      let claimedByOther: any | undefined;
+      let scanPage = 1;
+      while (!claimedByOther) {
+        const { data, error } = await admin.auth.admin.listUsers({ page: scanPage, perPage: 1000 });
+        if (error) {
+          console.error("listUsers (link mode) failed:", error);
+          break;
+        }
+        claimedByOther = data.users.find(
+          (u) =>
+            u.id !== linkTicketUserId &&
+            (u.user_metadata?.naver_id === naverId || (naverEmail && u.email === naverEmail))
+        );
+        if (claimedByOther || data.users.length < 1000) break;
+        scanPage += 1;
+      }
+
+      if (claimedByOther) {
+        return backToApp({ naver_link_error: "이미 다른 계정에 연결된 네이버 계정이에요" });
+      }
+
+      const { data: targetUserData, error: targetErr } = await admin.auth.admin.getUserById(linkTicketUserId);
+      if (targetErr || !targetUserData?.user) {
+        console.error("link mode: target user lookup failed:", targetErr);
+        return backToApp({ naver_link_error: "연결할 계정을 찾지 못했어요" });
+      }
+      const targetUser = targetUserData.user;
+      const existingProviders: string[] = Array.isArray(targetUser.app_metadata?.providers)
+        ? targetUser.app_metadata.providers
+        : [];
+      const { error: linkUpdateErr } = await admin.auth.admin.updateUserById(targetUser.id, {
+        app_metadata: {
+          ...targetUser.app_metadata,
+          provider: "naver",
+          providers: Array.from(new Set([...existingProviders, "naver"])),
+        },
+        user_metadata: {
+          ...targetUser.user_metadata,
+          naver_id: naverId,
+          // Don't clobber the account's main profile photo with Naver's —
+          // they didn't ask to change that, just to add a login method.
+          naver_avatar_url: p.profile_image ?? null,
+        },
+      });
+      if (linkUpdateErr) {
+        console.error("link mode: updateUserById failed:", linkUpdateErr);
+        return backToApp({ naver_link_error: "네이버 계정 연결에 실패했어요" });
+      }
+      return backToApp({ naver_linked: "1" });
+    }
+
+    // ---- LOGIN MODE ----
     // 3) Find the matching Supabase user, or create one.
     // NOTE: the Admin API has no "get user by email" lookup, so this scans
     // pages of users — fine at PETEED's current scale; worth revisiting

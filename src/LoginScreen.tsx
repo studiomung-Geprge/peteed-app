@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import PeteedLogo from './PeteedLogo'
 import { supabase, SUPABASE_ENABLED } from './lib/supabase'
+import { startNaverLogin } from './lib/naverAuth'
 
 interface LoginScreenProps {
   onLogin: () => void
@@ -187,24 +188,11 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     // this app talks to it directly: redirect to Naver's own consent screen,
     // and our `naver-auth` Supabase Edge Function (registered as Naver's
     // 콜백 URL) exchanges the code and hands a session back to App.tsx.
-    const clientId = import.meta.env.VITE_NAVER_CLIENT_ID as string | undefined
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
-    if (!clientId || !supabaseUrl) {
+    const started = startNaverLogin()
+    if (!started) {
       console.warn('Naver login: VITE_NAVER_CLIENT_ID이 설정되지 않았어요.')
       onLogin()
-      return
     }
-
-    const state = crypto.randomUUID()
-    sessionStorage.setItem('naver_oauth_state', state)
-
-    const redirectUri = `${supabaseUrl}/functions/v1/naver-auth`
-    const authorizeUrl = new URL('https://nid.naver.com/oauth2.0/authorize')
-    authorizeUrl.searchParams.set('response_type', 'code')
-    authorizeUrl.searchParams.set('client_id', clientId)
-    authorizeUrl.searchParams.set('redirect_uri', redirectUri)
-    authorizeUrl.searchParams.set('state', state)
-    window.location.href = authorizeUrl.toString()
   }
 
   return (

@@ -108,14 +108,35 @@ npm run build
      `?naver_token=...`을 붙여 앱으로 복귀 → `App.tsx`가 `supabase.auth.verifyOtp()`로 이
      토큰을 실제 로그인 세션으로 교환합니다. Client Secret과 Supabase 서비스 롤 키는 모두
      Edge Function 안에서만 쓰이고 브라우저에는 절대 노출되지 않습니다.
+
+  **마이페이지(계정 통합)**: 홈 화면 우측 상단이 로그아웃 버튼 대신 **마이페이지** 버튼입니다.
+  마이페이지(`src/MyPageScreen.tsx`)에서 현재 로그인 정보를 보여주고, 구글·카카오·네이버 세 계정을
+  하나로 통합해서 어떤 방법으로 로그인해도 같은 계정으로 이어지게 하며, 각 계정을 개별로
+  연결/해제할 수 있습니다.
+  - **구글/카카오 연결·해제**: Supabase가 기본 지원하는 `supabase.auth.linkIdentity()` /
+    `unlinkIdentity()` / `getUserIdentities()`를 그대로 씁니다. 이 기능이 동작하려면 **Supabase
+    대시보드 → Authentication → Providers → 하단 설정에서 "Manual Linking"을 켜야 합니다**
+    (기본값은 꺼짐 — 꺼진 상태로는 연결 버튼을 눌러도 오류가 납니다).
+  - **네이버 연결·해제**: 네이버는 Supabase의 진짜 identity가 아니라서(위 네이버 로그인 항목
+    참고) 자체 "티켓" 방식을 추가로 만들었습니다. 이미 로그인된 사용자가 "연결"을 누르면
+    `naver-link-start` Edge Function이 `oauth_link_tickets` 테이블(10분 만료, 1회용)에 티켓을
+    만들고, 그 티켓 id를 네이버 OAuth의 `state` 값으로 써서 네이버로 이동합니다. `naver-auth`가
+    콜백을 받으면 `state`가 살아있는 티켓인지 먼저 확인해서, 티켓이면 새 로그인 세션을 만드는 대신
+    그 티켓 주인 계정에 네이버 계정 정보를 붙이고 `?naver_linked=1`로 돌아옵니다(이미 로그인된
+    세션은 그대로 유지된 채 메타데이터만 새로고침합니다). "해제"는 `naver-unlink` Edge Function을
+    호출하며, 네이버 연결을 해제하면 로그인할 방법이 없어지는 경우(다른 로그인 수단이 하나도
+    없을 때)는 해제를 막습니다.
+  - **반려동물 정보 수정**: 마이페이지의 "반려동물 정보" 카드는 신분증(WalletTab) 탭의 "수정"
+    버튼과 완전히 동일한 `EditProfileModal` / `handleEditProfileSave` 흐름을 그대로 재사용합니다
+    — 어느 쪽에서 열어도 같은 창, 같은 저장 로직입니다.
 - **DB 스키마** (`public` 스키마, 전부 RLS 활성화):
   `profiles`(보호자), `pets`, `pet_guardians`(반려동물↔보호자 다대다), `health_records`,
   `facilities`(공공시설, 목업과 동일한 4곳 시드 완료), `facility_reservations`, `notifications`,
   `missing_reports`(실종신고), `blood_donation_requests`(헌혈매칭). auth.users에 새 계정이 생기면
   트리거가 자동으로 `profiles` 행을 만듭니다.
-- **연동 완료된 화면**: 로그인/회원가입/로그아웃, 홈 화면의 반려동물 사진(최초 로그인 시 "만두" pet
-  레코드를 자동 생성), 시설예약 탭 목록(`facilities` 테이블에서 조회, 로그아웃 버튼은 홈 화면 알림 카드
-  아래에 추가했습니다).
+- **연동 완료된 화면**: 로그인/회원가입, 마이페이지(계정 통합·해제/연결·로그아웃), 홈 화면의
+  반려동물 사진(최초 로그인 시 "만두" pet 레코드를 자동 생성), 시설예약 탭 목록(`facilities`
+  테이블에서 조회).
 - **아직 목업인 화면 (다음 단계)**: 건강기록 상세(`data/healthRecords.ts`, `type`/`memo`/`details` 등
   스키마 확장이 필요), 알림, 실종신고 접수 폼, 헌혈매칭 요청, 시설예약 실제 예약 흐름 — 테이블은
   이미 만들어져 있어서 프런트엔드만 연결하면 됩니다.

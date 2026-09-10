@@ -5,6 +5,7 @@ import { getMyPet, createMyPet, updateGuardianName, updatePetName, getGuardianNa
 import { HEALTH_RECORDS, type HealthRecord } from './data/healthRecords'
 import LoginScreen from './LoginScreen'
 import OnboardingScreen from './OnboardingScreen'
+import MyPageScreen from './MyPageScreen'
 import QRModal from './QRModal'
 import PetPhotoCapture from './PetPhotoCapture'
 import HealthDocCapture from './HealthDocCapture'
@@ -59,6 +60,7 @@ export default function App() {
   const [petBloodType, setPetBloodType] = useState('DEA 1.1 양성')
   const [guardianName, setGuardianName] = useState('죠지')
   const [showEditProfile, setShowEditProfile] = useState(false)
+  const [showMyPage, setShowMyPage] = useState(false)
   // null = not checked yet, true = real Supabase user with no pet on file
   // (needs the one-time onboarding form), false = ready to show the app.
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null)
@@ -73,26 +75,49 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  // Naver login return trip: unlike Google/Kakao (native Supabase OAuth
-  // providers, whose session Supabase's own SDK detects automatically), Naver
-  // is bridged through our own `naver-auth` Edge Function, which redirects
-  // back here with a one-time `naver_token` in the URL. Redeem it for a real
-  // Supabase session, then scrub the URL so the token doesn't linger in the
-  // address bar/history.
+  // Naver return trip: unlike Google/Kakao (native Supabase OAuth providers,
+  // whose session Supabase's own SDK detects automatically), Naver is
+  // bridged through our own `naver-auth` Edge Function. It redirects back
+  // here in one of two shapes depending on why the browser went to Naver:
+  //   - LOGIN: `naver_token` (redeem via verifyOtp → real session) or
+  //     `naver_error`.
+  //   - LINK (My Page → "네이버 연결"): `naver_linked=1` (the Naver account
+  //     is now attached to the already-signed-in user — just refresh the
+  //     session so the new metadata shows up) or `naver_link_error`.
+  // Either way we scrub the URL afterward so nothing lingers in the address
+  // bar/history.
   useEffect(() => {
     if (!SUPABASE_ENABLED || !supabase) return
     const params = new URLSearchParams(window.location.search)
     const naverToken = params.get('naver_token')
     const naverError = params.get('naver_error')
+    const naverLinked = params.get('naver_linked')
+    const naverLinkError = params.get('naver_link_error')
     const returnedState = params.get('state')
-    if (!naverToken && !naverError) return
+    if (!naverToken && !naverError && !naverLinked && !naverLinkError) return
 
     const cleanUrl = () => {
       const url = new URL(window.location.href)
       url.searchParams.delete('naver_token')
       url.searchParams.delete('naver_error')
+      url.searchParams.delete('naver_linked')
+      url.searchParams.delete('naver_link_error')
       url.searchParams.delete('state')
       window.history.replaceState({}, '', url.toString())
+    }
+
+    if (naverLinked || naverLinkError) {
+      if (naverLinkError) console.warn('네이버 계정 연결 실패:', naverLinkError)
+      if (naverLinked) {
+        // The Edge Function updated this user's metadata via the Admin API
+        // after our session's JWT was issued, so the cached claims are
+        // stale — refreshSession() re-fetches and re-embeds current
+        // app_metadata/user_metadata, which flows into React via the
+        // onAuthStateChange listener above.
+        supabase.auth.refreshSession().catch(err => console.warn('세션 갱신 실패:', err))
+      }
+      cleanUrl()
+      return
     }
 
     if (naverError) {
@@ -114,6 +139,18 @@ export default function App() {
         if (error) console.warn('Naver 로그인 세션 발급 실패:', error)
       })
       .finally(cleanUrl)
+  }, [])
+
+  // My Page sets this flag right before sending the browser off to link a
+  // Google/Kakao/Naver account (any of those redirects leave the page
+  // entirely, so plain in-memory state wouldn't survive the round trip). On
+  // the way back in, pick it back up so the user lands on My Page again
+  // instead of Home.
+  useEffect(() => {
+    if (sessionStorage.getItem('mypage_return_pending') === '1') {
+      sessionStorage.removeItem('mypage_return_pending')
+      setShowMyPage(true)
+    }
   }, [])
 
   // On login for a real Supabase user, check whether they already have a
@@ -199,6 +236,7 @@ export default function App() {
     if (supabase) await supabase.auth.signOut().catch(() => {})
     setSession(null)
     setDemoLoggedIn(false)
+    setShowMyPage(false)
   }
 
   const handleRegister = (photo: string, result: { breed: string; age: string; gender: string }) => {
@@ -251,6 +289,18 @@ export default function App() {
               onSave={handleEditProfileSave}
             />
           )}
+          {showMyPage && (
+            <MyPageScreen
+              session={session}
+              demoLoggedIn={demoLoggedIn}
+              guardianName={guardianName}
+              petName={petName}
+              petPhoto={petPhoto}
+              onBack={() => setShowMyPage(false)}
+              onEditProfile={() => setShowEditProfile(true)}
+              onLogout={handleLogout}
+            />
+          )}
           <div className="pl-dyn-island" />
           <div className="pl-status-bar">
             <span>9:41</span>
@@ -280,7 +330,7 @@ export default function App() {
                 onQRClick={() => setShowQR(true)}
                 onViewAllClick={() => switchTab('health')}
                 onQuickAction={handleQuickAction}
-                onLogout={handleLogout}
+                onOpenMyPage={() => setShowMyPage(true)}
               />
             </div>
 
